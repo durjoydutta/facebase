@@ -115,14 +115,22 @@ const RecognizeClient = ({ adminName, initialFaces }: RecognizeClientProps) => {
         return;
       }
 
-      overlay.width = video.videoWidth;
-      overlay.height = video.videoHeight;
+      const displayWidth = video.clientWidth || video.videoWidth;
+      const displayHeight = video.clientHeight || video.videoHeight;
+      overlay.width = displayWidth;
+      overlay.height = displayHeight;
       context.clearRect(0, 0, overlay.width, overlay.height);
 
       const stroke = recognized ? "#22c55e" : "#ef4444";
       context.strokeStyle = stroke;
       context.lineWidth = 5;
-      context.strokeRect(box.x, box.y, box.width, box.height);
+      const scaleX = displayWidth / video.videoWidth;
+      const scaleY = displayHeight / video.videoHeight;
+      const drawX = box.x * scaleX;
+      const drawY = box.y * scaleY;
+      const drawWidth = box.width * scaleX;
+      const drawHeight = box.height * scaleY;
+      context.strokeRect(drawX, drawY, drawWidth, drawHeight);
 
       const displayLabel =
         label.trim() || (recognized ? "Recognized" : "Unknown");
@@ -134,9 +142,9 @@ const RecognizeClient = ({ adminName, initialFaces }: RecognizeClientProps) => {
       const textWidth = metrics.width;
       const labelX = Math.max(
         0,
-        Math.min(box.x, overlay.width - textWidth - paddingX * 2)
+        Math.min(drawX, overlay.width - textWidth - paddingX * 2)
       );
-      const labelY = Math.max(0, box.y - 36);
+      const labelY = Math.max(0, drawY - 36);
 
       context.fillStyle = recognized
         ? "rgba(34,197,94,0.85)"

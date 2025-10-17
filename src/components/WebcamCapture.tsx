@@ -118,15 +118,24 @@ const WebcamCapture = ({
           return;
         }
 
-        overlay.width = video.videoWidth;
-        overlay.height = video.videoHeight;
+        const displayWidth = video.clientWidth || video.videoWidth;
+        const displayHeight = video.clientHeight || video.videoHeight;
+        overlay.width = displayWidth;
+        overlay.height = displayHeight;
         context.clearRect(0, 0, overlay.width, overlay.height);
 
         if (result) {
           const { box } = result;
+          const scaleX = displayWidth / video.videoWidth;
+          const scaleY = displayHeight / video.videoHeight;
+          const drawX = box.x * scaleX;
+          const drawY = box.y * scaleY;
+          const drawWidth = box.width * scaleX;
+          const drawHeight = box.height * scaleY;
+
           context.strokeStyle = "#2563eb";
-          context.lineWidth = 6;
-          context.strokeRect(box.x, box.y, box.width, box.height);
+          context.lineWidth = 4;
+          context.strokeRect(drawX, drawY, drawWidth, drawHeight);
         }
       } catch (error) {
         // ignore transient detection failures
