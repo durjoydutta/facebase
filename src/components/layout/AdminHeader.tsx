@@ -87,7 +87,7 @@ const AdminHeader = ({ profile }: AdminHeaderProps) => {
       <div className="mx-auto w-full max-w-6xl px-6 py-4 sm:px-10">
         <div className="relative flex items-center justify-between">
           <Link href="/" className="text-lg font-semibold">
-            FaceBase Admin
+            FaceBase
           </Link>
           <nav className="hidden items-center gap-2 sm:flex">
             {navItems.map((item) => (
