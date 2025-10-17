@@ -27,6 +27,7 @@ const WebcamCapture = ({
 }: WebcamCaptureProps) => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const overlayRef = useRef<HTMLCanvasElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const [isCapturing, setIsCapturing] = useState(false);
 
@@ -51,8 +52,12 @@ const WebcamCapture = ({
 
         streamRef.current = stream;
 
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
+        const video = videoRef.current;
+        if (video) {
+          video.srcObject = stream;
+          video.onloadedmetadata = () => {
+            video.play().catch(() => undefined);
+          };
         }
       } catch (error) {
         onError(
@@ -73,6 +78,74 @@ const WebcamCapture = ({
       }
     };
   }, [onError]);
+
+  useEffect(() => {
+    if (!modelsLoaded) {
+      const overlay = overlayRef.current;
+      const context = overlay?.getContext("2d");
+      if (context && overlay) {
+        context.clearRect(0, 0, overlay.width, overlay.height);
+      }
+      return;
+    }
+
+    const overlayElement = overlayRef.current;
+    let cancelled = false;
+    let frameId = 0;
+    let processing = false;
+
+    const detect = async () => {
+      frameId = window.requestAnimationFrame(detect);
+
+      if (cancelled || processing) {
+        return;
+      }
+
+      const video = videoRef.current;
+      const overlay = overlayRef.current;
+
+      if (!video || !overlay || video.readyState < 2) {
+        return;
+      }
+
+      processing = true;
+
+      try {
+        const result = await faceapi.detectSingleFace(video, detectionOptions);
+        const context = overlay.getContext("2d");
+
+        if (!context) {
+          return;
+        }
+
+        overlay.width = video.videoWidth;
+        overlay.height = video.videoHeight;
+        context.clearRect(0, 0, overlay.width, overlay.height);
+
+        if (result) {
+          const { box } = result;
+          context.strokeStyle = "#2563eb";
+          context.lineWidth = 6;
+          context.strokeRect(box.x, box.y, box.width, box.height);
+        }
+      } catch (error) {
+        // ignore transient detection failures
+      } finally {
+        processing = false;
+      }
+    };
+
+    frameId = window.requestAnimationFrame(detect);
+
+    return () => {
+      cancelled = true;
+      window.cancelAnimationFrame(frameId);
+      const context = overlayElement?.getContext("2d");
+      if (context && overlayElement) {
+        context.clearRect(0, 0, overlayElement.width, overlayElement.height);
+      }
+    };
+  }, [modelsLoaded]);
 
   const capture = useCallback(async () => {
     if (!modelsLoaded) {
@@ -161,6 +234,10 @@ const WebcamCapture = ({
           playsInline
           muted
           className="h-[260px] w-full bg-black object-cover"
+        />
+        <canvas
+          ref={overlayRef}
+          className="pointer-events-none absolute inset-0 h-full w-full"
         />
       </div>
       <button

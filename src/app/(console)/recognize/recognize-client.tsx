@@ -59,6 +59,7 @@ const fetcher = async (url: string): Promise<RecognitionFaceRow[]> => {
 const RecognizeClient = ({ adminName, initialFaces }: RecognizeClientProps) => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const overlayRef = useRef<HTMLCanvasElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const lastEventRef = useRef<{ identity: string | null; timestamp: number }>({
     identity: null,
@@ -91,6 +92,61 @@ const RecognizeClient = ({ adminName, initialFaces }: RecognizeClientProps) => {
   const [isWatching, setIsWatching] = useState(true);
   const [lastSyncedAt, setLastSyncedAt] = useState<Date>(() => new Date());
   const [isManualSyncing, setIsManualSyncing] = useState(false);
+  const clearOverlay = useCallback(() => {
+    const overlay = overlayRef.current;
+    const context = overlay?.getContext("2d");
+    if (context && overlay) {
+      context.clearRect(0, 0, overlay.width, overlay.height);
+    }
+  }, []);
+
+  const drawOverlay = useCallback(
+    (box: faceapi.Box, label: string, recognized: boolean) => {
+      const overlay = overlayRef.current;
+      const video = videoRef.current;
+
+      if (!overlay || !video) {
+        return;
+      }
+
+      const context = overlay.getContext("2d");
+
+      if (!context) {
+        return;
+      }
+
+      overlay.width = video.videoWidth;
+      overlay.height = video.videoHeight;
+      context.clearRect(0, 0, overlay.width, overlay.height);
+
+      const stroke = recognized ? "#22c55e" : "#ef4444";
+      context.strokeStyle = stroke;
+      context.lineWidth = 5;
+      context.strokeRect(box.x, box.y, box.width, box.height);
+
+      const displayLabel =
+        label.trim() || (recognized ? "Recognized" : "Unknown");
+      context.font = "32px sans-serif";
+      context.textBaseline = "top";
+      const paddingX = 12;
+      const paddingY = 6;
+      const metrics = context.measureText(displayLabel);
+      const textWidth = metrics.width;
+      const labelX = Math.max(
+        0,
+        Math.min(box.x, overlay.width - textWidth - paddingX * 2)
+      );
+      const labelY = Math.max(0, box.y - 36);
+
+      context.fillStyle = recognized
+        ? "rgba(34,197,94,0.85)"
+        : "rgba(239,68,68,0.85)";
+      context.fillRect(labelX, labelY, textWidth + paddingX * 2, 36);
+      context.fillStyle = "#ffffff";
+      context.fillText(displayLabel, labelX + paddingX, labelY + paddingY);
+    },
+    []
+  );
 
   useEffect(() => {
     if (data) {
@@ -321,6 +377,7 @@ const RecognizeClient = ({ adminName, initialFaces }: RecognizeClientProps) => {
 
   useEffect(() => {
     if (!modelsLoaded || !isWatching) {
+      clearOverlay();
       return;
     }
 
@@ -359,6 +416,7 @@ const RecognizeClient = ({ adminName, initialFaces }: RecognizeClientProps) => {
 
         if (!detection) {
           setLiveMatch(null);
+          clearOverlay();
           return;
         }
 
@@ -415,6 +473,13 @@ const RecognizeClient = ({ adminName, initialFaces }: RecognizeClientProps) => {
             };
 
         setLiveMatch(matchState);
+        const labelText =
+          matchState.status === "accepted" ? matchState.userName : "Unknown";
+        drawOverlay(
+          detection.detection.box,
+          labelText,
+          matchState.status === "accepted"
+        );
 
         if (shouldLog) {
           lastEventRef.current = { identity: identityKey, timestamp: now };
@@ -431,6 +496,7 @@ const RecognizeClient = ({ adminName, initialFaces }: RecognizeClientProps) => {
             ? error.message
             : "Real-time recognition failed."
         );
+        clearOverlay();
       } finally {
         processing = false;
       }
@@ -442,7 +508,14 @@ const RecognizeClient = ({ adminName, initialFaces }: RecognizeClientProps) => {
       cancelled = true;
       window.cancelAnimationFrame(frameId);
     };
-  }, [isWatching, logVisit, modelsLoaded, normalizedFaces]);
+  }, [
+    clearOverlay,
+    drawOverlay,
+    isWatching,
+    logVisit,
+    modelsLoaded,
+    normalizedFaces,
+  ]);
 
   useEffect(() => {
     return () => {
@@ -450,8 +523,9 @@ const RecognizeClient = ({ adminName, initialFaces }: RecognizeClientProps) => {
         streamRef.current.getTracks().forEach((track) => track.stop());
         streamRef.current = null;
       }
+      clearOverlay();
     };
-  }, []);
+  }, [clearOverlay]);
 
   const faceCount = normalizedFaces.length;
   const lastSyncedLabel = useMemo(
@@ -536,6 +610,10 @@ const RecognizeClient = ({ adminName, initialFaces }: RecognizeClientProps) => {
               playsInline
               muted
               className="h-[280px] w-full bg-black object-cover"
+            />
+            <canvas
+              ref={overlayRef}
+              className="pointer-events-none absolute inset-0 h-full w-full"
             />
             {isValidating ? (
               <span className="absolute right-3 top-3 rounded-full bg-background/80 px-3 py-1 text-xs font-medium text-muted-foreground">
