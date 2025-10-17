@@ -58,7 +58,7 @@ const AccountRibbon = ({ profile }: AccountRibbonProps) => {
         onClick={handleSignOut}
         disabled={signingOut || !supabase}
         className="rounded-full border border-border px-3 py-1 text-xs font-semibold transition hover:bg-muted/70 disabled:cursor-not-allowed disabled:opacity-70">
-        {signingOut ? "Signing out..." : "Sign out"}
+        {signingOut ? "SigningOut..." : "Sign Out"}
       </button>
     </div>
   );

@@ -254,7 +254,7 @@ const WebcamCapture = ({
         onClick={() => void capture()}
         disabled={!modelsLoaded || disabled || isCapturing}
         className="w-full rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60">
-        {isCapturing ? "Capturing..." : "Capture sample"}
+        {isCapturing ? "Capturing..." : "Capture Sample"}
       </button>
       <canvas ref={canvasRef} className="hidden" />
     </div>

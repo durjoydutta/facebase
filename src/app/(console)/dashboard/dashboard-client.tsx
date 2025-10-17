@@ -294,7 +294,7 @@ const DashboardClient = ({ adminName, initialData }: DashboardClientProps) => {
               onClick={handleManualSync}
               disabled={isManualSyncing}
               className="mt-1 inline-flex items-center gap-2 rounded-full border border-border bg-background px-4 py-2 text-xs font-medium text-foreground transition hover:border-primary/80 hover:text-primary disabled:cursor-not-allowed disabled:opacity-60">
-              {isManualSyncing ? "Syncing..." : "Sync now"}
+              {isManualSyncing ? "Syncing..." : "Sync Now"}
             </button>
           </div>
         </div>
@@ -454,7 +454,7 @@ const DashboardClient = ({ adminName, initialData }: DashboardClientProps) => {
                             user.name ?? "member"
                           }`}>
                           <ScanFace className="h-4 w-4" />
-                          <span className="sr-only">Add samples</span>
+                          <span className="sr-only">Add Samples</span>
                         </Link>
                         <button
                           type="button"
@@ -478,7 +478,7 @@ const DashboardClient = ({ adminName, initialData }: DashboardClientProps) => {
                             <UserX className="h-4 w-4" />
                           )}
                           <span className="sr-only">
-                            {user.is_banned ? "Unban user" : "Ban user"}
+                            {user.is_banned ? "UnbanUser" : "BanUser"}
                           </span>
                         </button>
                       </div>
@@ -593,7 +593,7 @@ const DashboardClient = ({ adminName, initialData }: DashboardClientProps) => {
                           user.name ?? ""
                         )}&prefillEmail=${encodeURIComponent(user.email)}`}
                         className="font-medium text-primary underline-offset-2 transition hover:underline">
-                        Add samples
+                        Add Samples
                       </Link>
                     </div>
                   </div>

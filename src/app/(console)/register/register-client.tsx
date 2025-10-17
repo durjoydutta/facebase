@@ -160,7 +160,9 @@ const RegisterClient = ({
   return (
     <main className="mx-auto w-full max-w-5xl space-y-8 px-6 pb-16 pt-6 sm:px-10">
       <header className="space-y-2">
-        <h1 className="text-3xl font-semibold tracking-tight">Register user</h1>
+        <h1 className="text-3xl font-semibold tracking-tight">
+          Register / Update User
+        </h1>
         <p className="text-sm text-muted-foreground">
           Capture at least three face samples to enroll a new member. Models are
           cached locally once loaded. Signed in as {adminName}.
@@ -253,7 +255,7 @@ const RegisterClient = ({
               type="submit"
               disabled={!canSubmit}
               className="w-full rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60">
-              {isSubmitting ? "Registering user..." : "Register user"}
+              {isSubmitting ? "RegisteringUser..." : "Register User"}
             </button>
             {isPrefilled ? (
               <button
@@ -266,7 +268,7 @@ const RegisterClient = ({
                   setEmail("");
                 }}
                 className="w-full text-xs font-medium text-muted-foreground underline-offset-2 transition hover:text-foreground hover:underline">
-                Clear prefilled details
+                ClearPrefilledDetails
               </button>
             ) : null}
           </form>

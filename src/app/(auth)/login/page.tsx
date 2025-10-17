@@ -222,7 +222,7 @@ SUPABASE_SECRET_KEY=your-service-role-key`}
             type="submit"
             disabled={isSigningIn}
             className="flex w-full items-center justify-center rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-70">
-            {isSigningIn ? "Signing in..." : "Sign in"}
+            {isSigningIn ? "Signing In..." : "SignIn"}
           </button>
         </form>
         <div className="mt-4 space-y-2 text-center text-sm">
@@ -230,12 +230,12 @@ SUPABASE_SECRET_KEY=your-service-role-key`}
             type="button"
             onClick={toggleResetForm}
             className="text-primary underline-offset-4 transition hover:underline">
-            {showResetForm ? "Back to sign in" : "Forgot password?"}
+            {showResetForm ? "Back To Sign In" : "Forgot Password?"}
           </button>
           <p className="text-xs text-muted-foreground">
             Need help?{" "}
             <Link href="mailto:security@example.com" className="underline">
-              Contact security
+              Contact Security
             </Link>
             .
           </p>
