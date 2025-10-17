@@ -1,6 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-import { getSupabaseAdminClient } from "@/lib/supabaseClient";
+import {
+  getSupabaseAdminClient,
+  type SupabaseAdminClient,
+} from "@/lib/supabaseClient";
 import { getSupabaseServerClient } from "@/lib/supabaseServerClient";
 import { randomUUID } from "node:crypto";
 import { Buffer } from "node:buffer";
@@ -11,6 +14,65 @@ interface SamplePayload {
 }
 
 const FACES_BUCKET = "faces";
+
+const ensureFacesBucket = async (adminClient: SupabaseAdminClient) => {
+  const { data: bucket, error: getError } = await adminClient.storage.getBucket(
+    FACES_BUCKET
+  );
+
+  if (bucket || !getError) {
+    return { error: null };
+  }
+
+  if (getError?.message && !getError.message.includes("not found")) {
+    return { error: getError };
+  }
+
+  const { error: createError } = await adminClient.storage.createBucket(
+    FACES_BUCKET,
+    {
+      public: true,
+      fileSizeLimit: 10 * 1024 * 1024,
+      allowedMimeTypes: ["image/png", "image/jpeg"],
+    }
+  );
+
+  return { error: createError };
+};
+
+const findAuthUserByEmail = async (
+  adminClient: SupabaseAdminClient,
+  email: string
+) => {
+  const normalized = email.toLowerCase();
+  const perPage = 200;
+  let page = 1;
+
+  for (;;) {
+    const { data, error } = await adminClient.auth.admin.listUsers({
+      page,
+      perPage,
+    });
+
+    if (error) {
+      return { user: null, error };
+    }
+
+    const match = data.users.find(
+      (candidate) => candidate.email?.toLowerCase() === normalized
+    );
+
+    if (match) {
+      return { user: match, error: null };
+    }
+
+    if (data.users.length < perPage) {
+      return { user: null, error: null };
+    }
+
+    page += 1;
+  }
+};
 
 const decodeBase64 = (
   dataUrl: string
@@ -55,6 +117,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
+    const { error: bucketError } = await ensureFacesBucket(adminClient);
+
+    if (bucketError) {
+      return NextResponse.json(
+        {
+          error: bucketError.message ?? "Unable to initialize storage bucket.",
+        },
+        { status: 500 }
+      );
+    }
+
     const payload = (await request.json()) as {
       name?: string;
       email?: string;
@@ -93,6 +166,23 @@ export async function POST(request: NextRequest) {
     }
 
     let authUserId = existingProfile?.auth_user_id ?? null;
+
+    if (!authUserId) {
+      const { user: existingAuthUser, error: lookupError } =
+        await findAuthUserByEmail(adminClient, email);
+
+      if (lookupError) {
+        return NextResponse.json(
+          {
+            error:
+              lookupError.message ?? "Unable to check existing credentials.",
+          },
+          { status: 500 }
+        );
+      }
+
+      authUserId = existingAuthUser?.id ?? null;
+    }
 
     if (!authUserId) {
       const password = randomUUID();
