@@ -4,6 +4,7 @@ auth_user_id uuid not null unique references auth.users(id) on delete cascade,
 name text not null,
 email text not null unique,
 role text not null check (role in ('admin', 'member')),
+is_banned boolean not null default false,
 created_at timestamp with time zone default timezone('utc', now())
 );
 

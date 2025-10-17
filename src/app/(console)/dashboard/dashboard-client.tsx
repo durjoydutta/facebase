@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import useSWR from "swr";
+import { ChevronDown, ScanFace, UserCheck, UserX } from "lucide-react";
 
 import type {
   DashboardData,
@@ -40,7 +41,10 @@ const formatDate = (iso: string) =>
 
 const AUTO_SYNC_INTERVAL_MS = 60_000;
 
-type UserWithFaces = DashboardUserRow & { faces: DashboardFaceRow[] };
+type UserDetails = DashboardUserRow & {
+  faces: DashboardFaceRow[];
+  visits: DashboardVisitRow[];
+};
 
 const DashboardClient = ({ adminName, initialData }: DashboardClientProps) => {
   const {
@@ -61,6 +65,10 @@ const DashboardClient = ({ adminName, initialData }: DashboardClientProps) => {
   const [deletingSamples, setDeletingSamples] = useState<Set<string>>(
     () => new Set()
   );
+  const [banningUsers, setBanningUsers] = useState<Set<string>>(
+    () => new Set()
+  );
+  const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
 
   useEffect(() => {
     if (data) {
@@ -101,18 +109,38 @@ const DashboardClient = ({ adminName, initialData }: DashboardClientProps) => {
     return map;
   }, [dashboard.faces]);
 
-  const usersWithFaces = useMemo<UserWithFaces[]>(() => {
+  const visitsByUser = useMemo(() => {
+    const map = new Map<string, DashboardVisitRow[]>();
+
+    for (const visit of dashboard.visits ?? []) {
+      if (!visit.matched_user_id) {
+        continue;
+      }
+
+      const bucket = map.get(visit.matched_user_id);
+      if (bucket) {
+        bucket.push(visit);
+      } else {
+        map.set(visit.matched_user_id, [visit]);
+      }
+    }
+
+    return map;
+  }, [dashboard.visits]);
+
+  const usersWithDetails = useMemo<UserDetails[]>(() => {
     const users = dashboard.users ?? [];
 
     return users.map((user) => ({
       ...user,
       faces: facesByUser.get(user.id) ?? [],
+      visits: visitsByUser.get(user.id) ?? [],
     }));
-  }, [dashboard.users, facesByUser]);
+  }, [dashboard.users, facesByUser, visitsByUser]);
 
-  const usersWithSamples = useMemo<UserWithFaces[]>(() => {
-    return usersWithFaces.filter((user) => user.faces.length > 0);
-  }, [usersWithFaces]);
+  const usersWithSamples = useMemo<UserDetails[]>(() => {
+    return usersWithDetails.filter((user) => user.faces.length > 0);
+  }, [usersWithDetails]);
 
   const handleManualSync = useCallback(async () => {
     try {
@@ -173,6 +201,58 @@ const DashboardClient = ({ adminName, initialData }: DashboardClientProps) => {
     },
     [mutate]
   );
+
+  const handleToggleBan = useCallback(
+    async (userId: string, nextState: boolean) => {
+      if (!userId) {
+        return;
+      }
+
+      setActionError(null);
+      setBanningUsers((previous) => {
+        const clone = new Set(previous);
+        clone.add(userId);
+        return clone;
+      });
+
+      try {
+        const response = await fetch(`/api/users/${userId}/ban`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ isBanned: nextState }),
+        });
+
+        if (!response.ok) {
+          const payload = (await response.json().catch(() => null)) as {
+            error?: string;
+          } | null;
+
+          throw new Error(payload?.error ?? "Failed to update ban status.");
+        }
+
+        await mutate(undefined, { revalidate: true });
+      } catch (error) {
+        setActionError(
+          error instanceof Error
+            ? error.message
+            : "Unable to update ban status."
+        );
+      } finally {
+        setBanningUsers((previous) => {
+          const clone = new Set(previous);
+          clone.delete(userId);
+          return clone;
+        });
+      }
+    },
+    [mutate]
+  );
+
+  const toggleExpandedUser = useCallback((userId: string) => {
+    setExpandedUserId((previous) => (previous === userId ? null : userId));
+  }, []);
 
   const totalUsers = dashboard.users?.length ?? 0;
   const totalFaceSamples = dashboard.faces?.length ?? 0;
@@ -321,60 +401,159 @@ const DashboardClient = ({ adminName, initialData }: DashboardClientProps) => {
               </p>
             </div>
           </header>
-          <div className="rounded-2xl border border-border bg-card shadow-sm">
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-border text-left text-sm">
-                <thead className="bg-muted/40 text-muted-foreground">
-                  <tr>
-                    <th className="px-4 py-3 font-medium">Name</th>
-                    <th className="px-4 py-3 font-medium">Email</th>
-                    <th className="px-4 py-3 font-medium">Face samples</th>
-                    <th className="px-4 py-3 font-medium">Role</th>
-                    <th className="px-4 py-3 font-medium">Added</th>
-                    <th className="px-4 py-3 font-medium">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {usersWithFaces.length ? (
-                    usersWithFaces.map((user: UserWithFaces) => (
-                      <tr key={user.id}>
-                        <td className="px-4 py-3 font-medium">
-                          {user.name ?? "Unnamed"}
-                        </td>
-                        <td className="px-4 py-3 text-muted-foreground">
-                          {user.email}
-                        </td>
-                        <td className="px-4 py-3 text-muted-foreground">
-                          {user.faces.length}
-                        </td>
-                        <td className="px-4 py-3 capitalize">{user.role}</td>
-                        <td className="px-4 py-3 text-muted-foreground">
-                          {formatDate(user.created_at)}
-                        </td>
-                        <td className="px-4 py-3">
-                          <Link
-                            href={`/register?prefillName=${encodeURIComponent(
-                              user.name ?? ""
-                            )}&prefillEmail=${encodeURIComponent(user.email)}`}
-                            className="text-sm font-medium text-primary underline-offset-2 transition hover:underline">
-                            Add samples
-                          </Link>
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td
-                        className="px-4 py-6 text-center text-muted-foreground"
-                        colSpan={6}>
-                        No users registered yet.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+          {usersWithDetails.length ? (
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {usersWithDetails.map((user) => {
+                const isExpanded = expandedUserId === user.id;
+                const visitPreviews = user.visits.slice(0, 4);
+
+                return (
+                  <article
+                    key={user.id}
+                    className={`rounded-2xl border p-5 shadow-sm transition ${
+                      user.is_banned
+                        ? "border-destructive/60 bg-destructive/5"
+                        : "border-border bg-card"
+                    }`}>
+                    <div className="flex items-start gap-3">
+                      <button
+                        type="button"
+                        onClick={() => toggleExpandedUser(user.id)}
+                        className="flex flex-1 items-start justify-between gap-3 text-left">
+                        <div>
+                          <p className="text-base font-semibold leading-tight">
+                            {user.name ?? "Unnamed"}
+                          </p>
+                          <p className="break-all text-xs text-muted-foreground">
+                            {user.email}
+                          </p>
+                          <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+                            <span className="rounded-full border border-border px-2.5 py-0.5 uppercase tracking-[0.18em]">
+                              {user.role}
+                            </span>
+                            <span>
+                              {user.faces.length} sample
+                              {user.faces.length === 1 ? "" : "s"}
+                            </span>
+                            <span>Joined {formatDate(user.created_at)}</span>
+                          </div>
+                        </div>
+                        <ChevronDown
+                          className={`mt-1 h-4 w-4 shrink-0 transition-transform duration-200 ${
+                            isExpanded ? "rotate-180" : ""
+                          }`}
+                        />
+                      </button>
+                      <div className="flex items-center gap-2">
+                        <Link
+                          href={`/register?prefillName=${encodeURIComponent(
+                            user.name ?? ""
+                          )}&prefillEmail=${encodeURIComponent(user.email)}`}
+                          className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-border bg-background text-foreground shadow-sm transition hover:border-primary/70 hover:text-primary"
+                          aria-label={`Add new samples for ${
+                            user.name ?? "member"
+                          }`}>
+                          <ScanFace className="h-4 w-4" />
+                          <span className="sr-only">Add samples</span>
+                        </Link>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            void handleToggleBan(user.id, !user.is_banned)
+                          }
+                          disabled={banningUsers.has(user.id)}
+                          className={`inline-flex h-9 w-9 items-center justify-center rounded-full border bg-background shadow-sm transition ${
+                            user.is_banned
+                              ? "border-destructive/70 text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                              : "border-border text-muted-foreground hover:border-destructive/60 hover:text-destructive"
+                          } disabled:cursor-not-allowed disabled:opacity-60`}
+                          aria-label={
+                            user.is_banned
+                              ? `Unban ${user.name ?? "member"}`
+                              : `Ban ${user.name ?? "member"}`
+                          }>
+                          {user.is_banned ? (
+                            <UserCheck className="h-4 w-4" />
+                          ) : (
+                            <UserX className="h-4 w-4" />
+                          )}
+                          <span className="sr-only">
+                            {user.is_banned ? "Unban user" : "Ban user"}
+                          </span>
+                        </button>
+                      </div>
+                    </div>
+                    {user.is_banned ? (
+                      <p className="mt-3 rounded-full border border-destructive/60 bg-destructive/10 px-3 py-1 text-xs font-medium text-destructive">
+                        Banned members are automatically rejected during
+                        recognition.
+                      </p>
+                    ) : null}
+                    {isExpanded ? (
+                      <div className="mt-4 border-t border-border pt-4">
+                        <div className="flex items-center justify-between gap-2">
+                          <h3 className="text-sm font-semibold">
+                            Recent visits
+                          </h3>
+                          <span className="text-xs text-muted-foreground">
+                            {visitPreviews.length
+                              ? `Showing ${visitPreviews.length} snapshot${
+                                  visitPreviews.length === 1 ? "" : "s"
+                                }`
+                              : "No snapshots yet"}
+                          </span>
+                        </div>
+                        {visitPreviews.length ? (
+                          <div className="mt-3 grid grid-cols-2 gap-3">
+                            {visitPreviews.map((visit) => (
+                              <div key={visit.id} className="space-y-2">
+                                <div className="relative h-28 overflow-hidden rounded-xl border border-border/60 bg-muted">
+                                  {visit.image_url ? (
+                                    <Image
+                                      src={visit.image_url}
+                                      alt={`Visit snapshot for ${
+                                        user.name ?? "member"
+                                      }`}
+                                      fill
+                                      className="object-cover"
+                                      sizes="(max-width: 640px) 50vw, 220px"
+                                    />
+                                  ) : (
+                                    <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
+                                      No snapshot
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="text-[11px] leading-tight text-muted-foreground">
+                                  <p>{formatDate(visit.timestamp)}</p>
+                                  <p
+                                    className={`font-medium ${
+                                      visit.status === "accepted"
+                                        ? "text-emerald-500"
+                                        : "text-destructive"
+                                    }`}>
+                                    {visit.status}
+                                  </p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="mt-3 text-sm text-muted-foreground">
+                            No recognition events recorded for this member yet.
+                          </p>
+                        )}
+                      </div>
+                    ) : null}
+                  </article>
+                );
+              })}
             </div>
-          </div>
+          ) : (
+            <div className="rounded-2xl border border-dashed border-border/80 bg-card p-10 text-center text-sm text-muted-foreground">
+              No users registered yet.
+            </div>
+          )}
         </section>
 
         <section className="space-y-4">
@@ -391,7 +570,7 @@ const DashboardClient = ({ adminName, initialData }: DashboardClientProps) => {
           </header>
           {usersWithSamples.length ? (
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-              {usersWithSamples.map((user: UserWithFaces) => (
+              {usersWithSamples.map((user: UserDetails) => (
                 <article
                   key={user.id}
                   className="flex h-full flex-col justify-between rounded-2xl border border-border bg-card p-6 shadow-sm">

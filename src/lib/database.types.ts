@@ -19,6 +19,7 @@ export interface Database {
           name: string | null;
           email: string;
           role: UserRole;
+          is_banned: boolean;
           created_at: string;
         };
         Insert: {
@@ -27,6 +28,7 @@ export interface Database {
           name?: string | null;
           email: string;
           role?: UserRole;
+          is_banned?: boolean;
           created_at?: string;
         };
         Update: {
@@ -35,6 +37,7 @@ export interface Database {
           name?: string | null;
           email?: string;
           role?: UserRole;
+          is_banned?: boolean;
           created_at?: string;
         };
         Relationships: [

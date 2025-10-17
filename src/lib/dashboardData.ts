@@ -6,6 +6,7 @@ export interface DashboardUserRow {
   name: string | null;
   email: string;
   role: "admin" | "member";
+  is_banned: boolean;
   created_at: string;
 }
 
@@ -21,6 +22,7 @@ export interface DashboardVisitRow {
   timestamp: string;
   status: VisitStatus;
   matched_user_id: string | null;
+  image_url: string | null;
 }
 
 export interface DashboardData {
@@ -35,11 +37,11 @@ export const fetchDashboardData = async (
   const [usersResult, visitsResult, facesResult] = await Promise.all([
     supabase
       .from("users")
-      .select("id, name, email, role, created_at")
+      .select("id, name, email, role, is_banned, created_at")
       .order("created_at", { ascending: false }),
     supabase
       .from("visits")
-      .select("id, timestamp, status, matched_user_id")
+      .select("id, timestamp, status, matched_user_id, image_url")
       .order("timestamp", { ascending: false })
       .limit(25),
     supabase

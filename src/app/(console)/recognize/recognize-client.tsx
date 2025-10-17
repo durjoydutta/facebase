@@ -27,14 +27,17 @@ interface RecognitionEvent {
   userName: string;
   userEmail: string;
   distance?: number | null;
+  isBanned: boolean;
 }
 
 interface LiveMatchState {
   status: VisitStatus;
+  statusLabel: string;
   userName: string;
   userEmail: string;
   distance: number | null;
   capturedAt: number;
+  isBanned: boolean;
 }
 
 interface RecognitionFaceDescriptor extends RecognitionFaceRow {
@@ -333,24 +336,25 @@ const RecognizeClient = ({ adminName, initialFaces }: RecognizeClientProps) => {
           };
         };
 
+        const resolvedName =
+          matchedUser?.user?.name ?? matchedUser?.user?.email ?? "member";
+        const isBanned = matchedUser?.user?.is_banned ?? false;
         const event: RecognitionEvent = {
           id: payload.visit.id,
           status,
           timestamp: new Date(payload.visit.timestamp).getTime(),
-          message:
-            status === "accepted"
-              ? `Access granted to ${
-                  matchedUser?.user?.name ??
-                  matchedUser?.user?.email ??
-                  "member"
-                }`
-              : "Access denied.",
+          message: isBanned
+            ? `Access denied. ${resolvedName} is banned.`
+            : status === "accepted"
+            ? `Access granted to ${resolvedName}`
+            : "Access denied.",
           userName:
             matchedUser?.user?.name ??
             matchedUser?.user?.email ??
             "Unknown visitor",
           userEmail: matchedUser?.user?.email ?? "",
           distance,
+          isBanned,
         };
 
         appendEvent(event);
@@ -446,47 +450,60 @@ const RecognizeClient = ({ adminName, initialFaces }: RecognizeClientProps) => {
           }
         }
 
-        const now = Date.now();
+        const matchedFace = bestMatch?.face ?? null;
+        const matchedUser = matchedFace?.user ?? null;
+        const matchedUserId = matchedUser?.id ?? matchedFace?.user_id ?? null;
+        const isBanned = matchedUser?.is_banned ?? false;
+
         const isRecognized = Boolean(
-          bestMatch &&
-            bestMatch.distance <= MATCH_THRESHOLD &&
-            (bestMatch.face.user?.id || bestMatch.face.user_id)
+          bestMatch && bestMatch.distance <= MATCH_THRESHOLD && matchedUserId
         );
 
+        const status: VisitStatus =
+          isRecognized && !isBanned ? "accepted" : "rejected";
+        const statusLabel = isRecognized
+          ? isBanned
+            ? "Banned"
+            : "Recognized"
+          : "Unrecognized";
+
+        const now = Date.now();
+
         const identityKey = isRecognized
-          ? `user:${bestMatch?.face.user?.id ?? bestMatch?.face.user_id}`
+          ? `user:${matchedUserId}:status:${status}`
           : "visitor:unknown";
 
         const shouldLog =
           now - lastEventRef.current.timestamp > CAPTURE_COOLDOWN_MS ||
           lastEventRef.current.identity !== identityKey;
 
-        const matchState: LiveMatchState = isRecognized
-          ? {
-              status: "accepted",
-              userName:
-                bestMatch?.face.user?.name ??
-                bestMatch?.face.user?.email ??
-                "Recognized member",
-              userEmail: bestMatch?.face.user?.email ?? "",
-              distance: bestMatch?.distance ?? null,
-              capturedAt: now,
-            }
-          : {
-              status: "rejected",
-              userName: "Unknown visitor",
-              userEmail: "",
-              distance: bestMatch?.distance ?? null,
-              capturedAt: now,
-            };
+        const userName = isRecognized
+          ? matchedUser?.name ?? matchedUser?.email ?? "Recognized member"
+          : "Unknown visitor";
+        const userEmail = isRecognized ? matchedUser?.email ?? "" : "";
+
+        const matchState: LiveMatchState = {
+          status,
+          statusLabel,
+          userName,
+          userEmail,
+          distance: bestMatch?.distance ?? null,
+          capturedAt: now,
+          isBanned,
+        };
 
         setLiveMatch(matchState);
-        const labelText =
-          matchState.status === "accepted" ? matchState.userName : "Unknown";
+
+        const overlayLabel = isRecognized
+          ? isBanned
+            ? `${userName} (banned)`
+            : userName
+          : "Unknown";
+
         drawOverlay(
           detection.detection.box,
-          labelText,
-          matchState.status === "accepted"
+          overlayLabel,
+          status === "accepted"
         );
 
         if (shouldLog) {
@@ -494,7 +511,7 @@ const RecognizeClient = ({ adminName, initialFaces }: RecognizeClientProps) => {
 
           await logVisit(
             matchState.status,
-            isRecognized ? bestMatch?.face ?? null : null,
+            isRecognized ? matchedFace : null,
             bestMatch?.distance ?? null
           );
         }
@@ -641,10 +658,15 @@ const RecognizeClient = ({ adminName, initialFaces }: RecognizeClientProps) => {
             <h2 className="text-lg font-semibold">Current status</h2>
             {liveMatch ? (
               <div className="mt-4 space-y-2">
-                <p className="text-sm font-medium">
-                  {liveMatch.status === "accepted"
-                    ? "Recognized"
-                    : "Unrecognized"}
+                <p
+                  className={`text-sm font-medium ${
+                    liveMatch.isBanned
+                      ? "text-destructive"
+                      : liveMatch.status === "accepted"
+                      ? "text-emerald-500"
+                      : "text-muted-foreground"
+                  }`}>
+                  {liveMatch.statusLabel}
                 </p>
                 <p className="text-2xl font-semibold tracking-tight">
                   {liveMatch.userName}
@@ -652,6 +674,11 @@ const RecognizeClient = ({ adminName, initialFaces }: RecognizeClientProps) => {
                 {liveMatch.userEmail ? (
                   <p className="text-sm text-muted-foreground">
                     {liveMatch.userEmail}
+                  </p>
+                ) : null}
+                {liveMatch.isBanned ? (
+                  <p className="rounded-full border border-destructive/50 bg-destructive/10 px-3 py-1 text-xs font-medium text-destructive">
+                    Banned user
                   </p>
                 ) : null}
                 <p className="text-xs text-muted-foreground">
@@ -694,6 +721,11 @@ const RecognizeClient = ({ adminName, initialFaces }: RecognizeClientProps) => {
                       </span>
                     </div>
                     <p className="text-sm text-foreground">{event.message}</p>
+                    {event.isBanned ? (
+                      <span className="inline-flex w-fit items-center gap-1 rounded-full border border-destructive/60 bg-destructive/10 px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-destructive">
+                        Banned
+                      </span>
+                    ) : null}
                     {event.distance !== undefined ? (
                       <p className="text-xs text-muted-foreground">
                         Distance:{" "}

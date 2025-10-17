@@ -10,6 +10,7 @@ export interface RecognitionFaceRow {
     id: string;
     name: string | null;
     email: string;
+    is_banned: boolean;
   } | null;
 }
 
@@ -19,7 +20,7 @@ export const fetchRecognitionEmbeddings = async (
   const { data, error } = await supabase
     .from("faces")
     .select(
-      "id, user_id, embedding, image_url, created_at, user:users(id, name, email)"
+      "id, user_id, embedding, image_url, created_at, user:users(id, name, email, is_banned)"
     )
     .order("created_at", { ascending: false });
 
@@ -59,6 +60,10 @@ export const fetchRecognitionEmbeddings = async (
                 "email" in user && typeof user.email === "string"
                   ? user.email
                   : "",
+              is_banned:
+                "is_banned" in user && typeof user.is_banned === "boolean"
+                  ? user.is_banned
+                  : false,
             }
           : null,
       },
