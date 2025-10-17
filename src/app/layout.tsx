@@ -19,10 +19,11 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "Face Access Control",
-    template: "%s | Face Access Control",
+    default: "facebase",
+    template: "%s | facebase",
   },
-  description: "Admin console for managing face-based access control.",
+  description:
+    "facebase is the centralized console for biometric access management.",
 };
 
 const RootLayout = ({ children }: Readonly<{ children: ReactNode }>) => (
