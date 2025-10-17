@@ -29,7 +29,7 @@ export const requireAdmin = async (): Promise<AuthContext> => {
   const adminClient = getSupabaseAdminClient();
   const { data: profile, error } = await adminClient
     .from("users")
-    .select("id, auth_user_id, name, email, role, created_at")
+    .select("id, auth_user_id, name, email, role, is_banned, created_at")
     .eq("auth_user_id", user.id)
     .single();
 
@@ -57,7 +57,7 @@ export const getOptionalAdminProfile = async () => {
     const adminClient = getSupabaseAdminClient();
     const { data: profile } = await adminClient
       .from("users")
-      .select("id, auth_user_id, name, email, role, created_at")
+      .select("id, auth_user_id, name, email, role, is_banned, created_at")
       .eq("auth_user_id", user.id)
       .maybeSingle();
 
