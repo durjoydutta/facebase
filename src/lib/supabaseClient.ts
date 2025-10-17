@@ -3,18 +3,28 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 import type { Database } from "./database.types";
 
-const getEnv = (key: string): string => {
-  const value = process.env[key];
+const getEnv = (key: string, fallbacks: string[] = []): string => {
+  const attempts = [key, ...fallbacks];
 
-  if (!value) {
-    throw new Error(`Missing environment variable: ${key}`);
+  for (const attempt of attempts) {
+    const value = process.env[attempt];
+
+    if (value) {
+      return value;
+    }
   }
 
-  return value;
+  throw new Error(`Missing environment variable: ${key}`);
 };
 
-const supabaseProjectUrl = getEnv("NEXT_PUBLIC_SUPABASE_URL");
-const supabaseServiceKey = getEnv("NEXT_PUBLIC_SUPABASE_SERVICE_KEY");
+const supabaseProjectUrl = getEnv("SUPABASE_PROJECT_URL", [
+  "NEXT_PUBLIC_SUPABASE_URL",
+]);
+const supabaseServiceKey = getEnv("SUPABASE_SECRET_KEY", [
+  "SUPABASE_SERVICE_KEY",
+  "NEXT_PUBLIC_SUPABASE_SERVICE_KEY",
+  "NEXT_PUBLIC_SUPABASE_SECRET_KEY",
+]);
 
 let cachedClient: SupabaseClient<Database> | undefined;
 
