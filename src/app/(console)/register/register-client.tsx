@@ -8,22 +8,43 @@ import WebcamCapture, { type CapturedSample } from "@/components/WebcamCapture";
 
 interface RegisterClientProps {
   adminName: string;
+  initialName?: string;
+  initialEmail?: string;
 }
 
 const MODEL_URL = "/models";
 const MIN_SAMPLES = 3;
 
-const RegisterClient = ({ adminName }: RegisterClientProps) => {
+const RegisterClient = ({
+  adminName,
+  initialName,
+  initialEmail,
+}: RegisterClientProps) => {
   const [modelsLoaded, setModelsLoaded] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState<string | null>(
     "Loading face detection models..."
   );
   const [samples, setSamples] = useState<CapturedSample[]>([]);
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
+  const [baselineName, setBaselineName] = useState(initialName ?? "");
+  const [baselineEmail, setBaselineEmail] = useState(initialEmail ?? "");
+  const [name, setName] = useState(initialName ?? "");
+  const [email, setEmail] = useState(initialEmail ?? "");
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [isSubmitting, startSubmit] = useTransition();
+  const [isPrefilled, setIsPrefilled] = useState(
+    Boolean(initialName || initialEmail)
+  );
+
+  useEffect(() => {
+    const resolvedName = initialName ?? "";
+    const resolvedEmail = initialEmail ?? "";
+    setBaselineName(resolvedName);
+    setBaselineEmail(resolvedEmail);
+    setName(resolvedName);
+    setEmail(resolvedEmail);
+    setIsPrefilled(Boolean(initialName || initialEmail));
+  }, [initialEmail, initialName]);
 
   useEffect(() => {
     let cancelled = false;
@@ -70,9 +91,13 @@ const RegisterClient = ({ adminName }: RegisterClientProps) => {
 
   const resetForm = () => {
     setSamples([]);
-    setName("");
-    setEmail("");
-    setStatus("Registration complete. Ready for the next user.");
+    setName(baselineName);
+    setEmail(baselineEmail);
+    setStatus(
+      isPrefilled
+        ? "Face samples updated. Ready when you are for another capture."
+        : "Registration complete. Ready for the next user."
+    );
   };
 
   const canSubmit = useMemo(
@@ -140,6 +165,11 @@ const RegisterClient = ({ adminName }: RegisterClientProps) => {
           Capture at least three face samples to enroll a new member. Models are
           cached locally once loaded. Signed in as {adminName}.
         </p>
+        {isPrefilled ? (
+          <p className="text-xs text-primary">
+            Updating samples for {initialName ?? initialEmail}.
+          </p>
+        ) : null}
       </header>
       <div className="grid gap-6 lg:grid-cols-[360px_1fr]">
         <section className="rounded-2xl border border-border bg-card p-6 shadow-sm">
@@ -225,6 +255,20 @@ const RegisterClient = ({ adminName }: RegisterClientProps) => {
               className="w-full rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60">
               {isSubmitting ? "Registering user..." : "Register user"}
             </button>
+            {isPrefilled ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setIsPrefilled(false);
+                  setBaselineName("");
+                  setBaselineEmail("");
+                  setName("");
+                  setEmail("");
+                }}
+                className="w-full text-xs font-medium text-muted-foreground underline-offset-2 transition hover:text-foreground hover:underline">
+                Clear prefilled details
+              </button>
+            ) : null}
           </form>
         </section>
       </div>
