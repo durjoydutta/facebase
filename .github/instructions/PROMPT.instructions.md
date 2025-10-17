@@ -10,7 +10,7 @@ applyTo: "**"
 >
 > ### 🧱 Project Overview
 >
-> - Name: `face-access-control`
+> - Name: `facebase`
 > - Framework: Next.js (TypeScript, App Router)
 > - Styling: Tailwind + shadcn/ui
 > - Database + Auth + Storage: Supabase
@@ -54,7 +54,7 @@ applyTo: "**"
 >
 > 6. **Future Raspberry Pi Integration**
 >
->    - Add an API route `/api/access-control` that will later send a webhook or MQTT message to a Raspberry Pi endpoint.
+>    - Add an API route `/api/facebase` that will later send a webhook or MQTT message to a Raspberry Pi endpoint.
 >    - On “Accepted” → Pi unlocks solenoid.
 >    - On “Rejected” → door remains locked.
 >
