@@ -80,7 +80,7 @@ const AdminHeader = ({ profile }: AdminHeaderProps) => {
     <header className="border-b border-border bg-card/60 backdrop-blur supports-[backdrop-filter]:bg-card/75">
       <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-4 sm:px-10">
         <Link href="/dashboard" className="text-lg font-semibold">
-          FaceBase Admin
+          FaceBase
         </Link>
         <nav className="hidden items-center gap-2 sm:flex">
           {navItems.map((item) => (
