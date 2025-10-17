@@ -177,6 +177,13 @@ const DashboardClient = ({ adminName, initialData }: DashboardClientProps) => {
   const totalUsers = dashboard.users?.length ?? 0;
   const totalFaceSamples = dashboard.faces?.length ?? 0;
   const totalVisits = dashboard.visits?.length ?? 0;
+  const recentVisits = useMemo(() => {
+    if (!dashboard.visits) {
+      return [];
+    }
+
+    return dashboard.visits.slice(0, 10);
+  }, [dashboard.visits]);
 
   const lastSyncedLabel = useMemo(
     () => formatDate(lastSyncedAt.toISOString()),
@@ -256,7 +263,7 @@ const DashboardClient = ({ adminName, initialData }: DashboardClientProps) => {
           <header className="flex items-center justify-between">
             <h2 className="text-lg font-semibold">Recent activity</h2>
             <p className="text-xs text-muted-foreground">
-              Showing last {totalVisits} events.
+              Showing last {recentVisits.length} events.
             </p>
           </header>
           <div className="rounded-2xl border border-border bg-card shadow-sm">
@@ -270,8 +277,8 @@ const DashboardClient = ({ adminName, initialData }: DashboardClientProps) => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {dashboard.visits?.length ? (
-                    dashboard.visits.map((visit: DashboardVisitRow) => {
+                  {recentVisits.length ? (
+                    recentVisits.map((visit: DashboardVisitRow) => {
                       const matchedUser = visit.matched_user_id
                         ? usersById.get(visit.matched_user_id)
                         : null;
