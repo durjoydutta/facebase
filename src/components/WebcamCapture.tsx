@@ -114,8 +114,15 @@ const WebcamCapture = ({
         return;
       }
 
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
+      const maxDimension = 640;
+      const { videoWidth, videoHeight } = video;
+      const scale = Math.min(
+        1,
+        maxDimension / Math.max(videoWidth, videoHeight)
+      );
+
+      canvas.width = Math.round(videoWidth * scale);
+      canvas.height = Math.round(videoHeight * scale);
       const context = canvas.getContext("2d");
 
       if (!context) {
@@ -124,7 +131,7 @@ const WebcamCapture = ({
       }
 
       context.drawImage(video, 0, 0, canvas.width, canvas.height);
-      const imageDataUrl = canvas.toDataURL("image/png");
+      const imageDataUrl = canvas.toDataURL("image/jpeg", 0.85);
 
       const sample: CapturedSample = {
         id: crypto.randomUUID(),

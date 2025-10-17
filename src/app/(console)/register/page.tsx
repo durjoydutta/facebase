@@ -5,19 +5,20 @@ import RegisterClient from "./register-client";
 export const dynamic = "force-dynamic";
 
 interface RegisterPageProps {
-  searchParams?: Record<string, string | string[] | undefined>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }
 
 const RegisterPage = async ({ searchParams }: RegisterPageProps) => {
   const { profile } = await requireAdmin();
+  const resolvedParams = searchParams ? await searchParams : {};
 
   const prefillName =
-    typeof searchParams?.prefillName === "string"
-      ? searchParams.prefillName
+    typeof resolvedParams.prefillName === "string"
+      ? resolvedParams.prefillName
       : undefined;
   const prefillEmail =
-    typeof searchParams?.prefillEmail === "string"
-      ? searchParams.prefillEmail
+    typeof resolvedParams.prefillEmail === "string"
+      ? resolvedParams.prefillEmail
       : undefined;
 
   return (
