@@ -41,3 +41,33 @@ export const requireAdmin = async (): Promise<AuthContext> => {
 
   return { user, profile };
 };
+
+export const getOptionalAdminProfile = async () => {
+  try {
+    const supabase = await getSupabaseServerClient();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return null;
+    }
+
+    const adminClient = getSupabaseAdminClient();
+    const { data: profile } = await adminClient
+      .from("users")
+      .select("id, auth_user_id, name, email, role, created_at")
+      .eq("auth_user_id", user.id)
+      .maybeSingle();
+
+    if (!profile || profile.role !== "admin") {
+      return null;
+    }
+
+    return profile;
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : error);
+    return null;
+  }
+};

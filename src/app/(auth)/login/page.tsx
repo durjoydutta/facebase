@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState, useTransition } from "react";
+import { FormEvent, useEffect, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -21,9 +21,50 @@ const LoginPage = () => {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
-  const [isPending, startTransition] = useTransition();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [resetEmail, setResetEmail] = useState("");
+  const [showResetForm, setShowResetForm] = useState(false);
+  const [isSigningIn, startSignInTransition] = useTransition();
+  const [isResetting, startResetTransition] = useTransition();
+  const supabase = supabaseClient;
 
-  if (!supabaseClient) {
+  useEffect(() => {
+    if (!supabase) {
+      return;
+    }
+
+    let active = true;
+
+    const checkSession = async () => {
+      const { data } = await supabase.auth.getSession();
+
+      if (!active) {
+        return;
+      }
+
+      if (data.session) {
+        router.replace("/dashboard");
+      }
+    };
+
+    void checkSession();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) {
+        router.replace("/dashboard");
+      }
+    });
+
+    return () => {
+      active = false;
+      subscription.unsubscribe();
+    };
+  }, [router, supabase]);
+
+  if (!supabase) {
     return (
       <main className="flex min-h-[70vh] flex-col items-center justify-center px-6 py-16 sm:px-10">
         <div className="w-full max-w-md rounded-2xl border border-border bg-card p-8 shadow-sm">
@@ -54,25 +95,21 @@ SUPABASE_SECRET_KEY=your-service-role-key`}
     );
   }
 
-  const supabase = supabaseClient;
-
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const formData = new FormData(event.currentTarget);
-    const email = String(formData.get("email") ?? "").trim();
-    const password = String(formData.get("password") ?? "");
-
     setError(null);
     setStatus(null);
 
-    startTransition(async () => {
-      if (!email || !password) {
+    startSignInTransition(async () => {
+      const trimmedEmail = email.trim();
+
+      if (!trimmedEmail || !password) {
         setError("Email and password are required.");
         return;
       }
 
       const { error: signInError } = await supabase.auth.signInWithPassword({
-        email,
+        email: trimmedEmail,
         password,
       });
 
@@ -86,35 +123,64 @@ SUPABASE_SECRET_KEY=your-service-role-key`}
     });
   };
 
-  const handleResetPassword = async () => {
-    const email = prompt("Enter the admin email to send a reset link");
+  const handleResetPassword = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setError(null);
+    setStatus(null);
 
-    if (!email) {
-      return;
-    }
+    startResetTransition(async () => {
+      const targetEmail = (resetEmail || email).trim();
 
-    const { error: resetError } = await supabase.auth.resetPasswordForEmail(
-      email,
-      {
-        redirectTo: `${window.location.origin}/auth/update-password`,
+      if (!targetEmail) {
+        setError("Enter the admin email to send a reset link.");
+        return;
       }
-    );
 
-    if (resetError) {
-      setError(resetError.message);
-      return;
-    }
+      const deployedUrl = process.env.NEXT_DEPLOYED_URL?.replace(/\/$/, "");
+      const fallbackUrl =
+        typeof window !== "undefined"
+          ? `${window.location.origin}/update-password`
+          : undefined;
+      const redirectTo = deployedUrl
+        ? `${deployedUrl}/update-password`
+        : fallbackUrl;
+      const resetOptions = redirectTo ? { redirectTo } : undefined;
 
-    setStatus("Password reset link sent.");
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(
+        targetEmail,
+        resetOptions
+      );
+
+      if (resetError) {
+        setError(resetError.message);
+        return;
+      }
+
+      setStatus("Password reset link sent.");
+      setShowResetForm(false);
+      setResetEmail("");
+    });
+  };
+
+  const toggleResetForm = () => {
+    setError(null);
+    setStatus(null);
+    setShowResetForm((previous) => {
+      if (previous) {
+        setResetEmail("");
+        return false;
+      }
+
+      setResetEmail((value) => value || email.trim());
+      return true;
+    });
   };
 
   return (
     <main className="flex min-h-[70vh] flex-col items-center justify-center px-6 py-16 sm:px-10">
       <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-8 shadow-sm">
         <div className="space-y-2 text-center">
-          <h1 className="text-2xl font-semibold tracking-tight">
-            Admin sign in
-          </h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Admin Login</h1>
           <p className="text-sm text-muted-foreground">
             Use your Supabase admin credentials to access the console.
           </p>
@@ -131,6 +197,8 @@ SUPABASE_SECRET_KEY=your-service-role-key`}
               required
               autoComplete="email"
               placeholder="admin@example.com"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
               className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             />
           </div>
@@ -145,22 +213,24 @@ SUPABASE_SECRET_KEY=your-service-role-key`}
               required
               autoComplete="current-password"
               placeholder="••••••••"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
               className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             />
           </div>
           <button
             type="submit"
-            disabled={isPending}
+            disabled={isSigningIn}
             className="flex w-full items-center justify-center rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-70">
-            {isPending ? "Signing in..." : "Sign in"}
+            {isSigningIn ? "Signing in..." : "Sign in"}
           </button>
         </form>
         <div className="mt-4 space-y-2 text-center text-sm">
           <button
             type="button"
-            onClick={handleResetPassword}
+            onClick={toggleResetForm}
             className="text-primary underline-offset-4 transition hover:underline">
-            Forgot password?
+            {showResetForm ? "Back to sign in" : "Forgot password?"}
           </button>
           <p className="text-xs text-muted-foreground">
             Need help?{" "}
@@ -170,6 +240,41 @@ SUPABASE_SECRET_KEY=your-service-role-key`}
             .
           </p>
         </div>
+        {showResetForm ? (
+          <div className="mt-6 space-y-3 rounded-lg border border-border bg-muted/40 p-4 text-left">
+            <div>
+              <h2 className="text-sm font-semibold">Send a reset link</h2>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Enter the email associated with your admin account and we will
+                send a secure link to update the password.
+              </p>
+            </div>
+            <form className="space-y-3" onSubmit={handleResetPassword}>
+              <div className="space-y-2">
+                <label className="text-xs font-medium" htmlFor="reset-email">
+                  Admin email
+                </label>
+                <input
+                  id="reset-email"
+                  name="reset-email"
+                  type="email"
+                  autoComplete="email"
+                  value={resetEmail}
+                  onChange={(event) => setResetEmail(event.target.value)}
+                  className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  placeholder="admin@example.com"
+                  required
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={isResetting}
+                className="flex w-full items-center justify-center rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-70">
+                {isResetting ? "Sending link..." : "Email reset link"}
+              </button>
+            </form>
+          </div>
+        ) : null}
         {(error || status) && (
           <div className="mt-6 rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm">
             {error ? (
