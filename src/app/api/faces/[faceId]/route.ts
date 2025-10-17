@@ -19,7 +19,7 @@ export const dynamic = "force-dynamic";
 
 export async function DELETE(
   _request: NextRequest,
-  { params }: { params: { faceId: string } }
+  context: { params: Promise<{ faceId: string }> }
 ) {
   const session = await resolveAdminSession();
 
@@ -31,7 +31,7 @@ export async function DELETE(
   }
 
   const supabase = session.adminClient;
-  const faceId = params.faceId;
+  const { faceId } = await context.params;
 
   if (!faceId) {
     return NextResponse.json(

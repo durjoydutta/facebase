@@ -259,47 +259,49 @@ const DashboardClient = ({ adminName, initialData }: DashboardClientProps) => {
               Showing last {totalVisits} events.
             </p>
           </header>
-          <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
-            <table className="min-w-full divide-y divide-border text-left text-sm">
-              <thead className="bg-muted/40 text-muted-foreground">
-                <tr>
-                  <th className="px-4 py-3 font-medium">Status</th>
-                  <th className="px-4 py-3 font-medium">Timestamp</th>
-                  <th className="px-4 py-3 font-medium">Matched user</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {dashboard.visits?.length ? (
-                  dashboard.visits.map((visit: DashboardVisitRow) => {
-                    const matchedUser = visit.matched_user_id
-                      ? usersById.get(visit.matched_user_id)
-                      : null;
-
-                    return (
-                      <tr key={visit.id}>
-                        <td className="px-4 py-3 font-medium capitalize">
-                          {visit.status}
-                        </td>
-                        <td className="px-4 py-3 text-muted-foreground">
-                          {formatDate(visit.timestamp)}
-                        </td>
-                        <td className="px-4 py-3 text-muted-foreground">
-                          {matchedUser?.name ?? "Unknown"}
-                        </td>
-                      </tr>
-                    );
-                  })
-                ) : (
+          <div className="rounded-2xl border border-border bg-card shadow-sm">
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-border text-left text-sm">
+                <thead className="bg-muted/40 text-muted-foreground">
                   <tr>
-                    <td
-                      className="px-4 py-6 text-center text-muted-foreground"
-                      colSpan={3}>
-                      No visits recorded yet.
-                    </td>
+                    <th className="px-4 py-3 font-medium">Status</th>
+                    <th className="px-4 py-3 font-medium">Timestamp</th>
+                    <th className="px-4 py-3 font-medium">Matched user</th>
                   </tr>
-                )}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {dashboard.visits?.length ? (
+                    dashboard.visits.map((visit: DashboardVisitRow) => {
+                      const matchedUser = visit.matched_user_id
+                        ? usersById.get(visit.matched_user_id)
+                        : null;
+
+                      return (
+                        <tr key={visit.id}>
+                          <td className="px-4 py-3 font-medium capitalize">
+                            {visit.status}
+                          </td>
+                          <td className="px-4 py-3 text-muted-foreground">
+                            {formatDate(visit.timestamp)}
+                          </td>
+                          <td className="px-4 py-3 text-muted-foreground">
+                            {matchedUser?.name ?? "Unknown"}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  ) : (
+                    <tr>
+                      <td
+                        className="px-4 py-6 text-center text-muted-foreground"
+                        colSpan={3}>
+                        No visits recorded yet.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </section>
 
@@ -312,57 +314,59 @@ const DashboardClient = ({ adminName, initialData }: DashboardClientProps) => {
               </p>
             </div>
           </header>
-          <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
-            <table className="min-w-full divide-y divide-border text-left text-sm">
-              <thead className="bg-muted/40 text-muted-foreground">
-                <tr>
-                  <th className="px-4 py-3 font-medium">Name</th>
-                  <th className="px-4 py-3 font-medium">Email</th>
-                  <th className="px-4 py-3 font-medium">Face samples</th>
-                  <th className="px-4 py-3 font-medium">Role</th>
-                  <th className="px-4 py-3 font-medium">Added</th>
-                  <th className="px-4 py-3 font-medium">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {usersWithFaces.length ? (
-                  usersWithFaces.map((user: UserWithFaces) => (
-                    <tr key={user.id}>
-                      <td className="px-4 py-3 font-medium">
-                        {user.name ?? "Unnamed"}
-                      </td>
-                      <td className="px-4 py-3 text-muted-foreground">
-                        {user.email}
-                      </td>
-                      <td className="px-4 py-3 text-muted-foreground">
-                        {user.faces.length}
-                      </td>
-                      <td className="px-4 py-3 capitalize">{user.role}</td>
-                      <td className="px-4 py-3 text-muted-foreground">
-                        {formatDate(user.created_at)}
-                      </td>
-                      <td className="px-4 py-3">
-                        <Link
-                          href={`/register?prefillName=${encodeURIComponent(
-                            user.name ?? ""
-                          )}&prefillEmail=${encodeURIComponent(user.email)}`}
-                          className="text-sm font-medium text-primary underline-offset-2 transition hover:underline">
-                          Add samples
-                        </Link>
+          <div className="rounded-2xl border border-border bg-card shadow-sm">
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-border text-left text-sm">
+                <thead className="bg-muted/40 text-muted-foreground">
+                  <tr>
+                    <th className="px-4 py-3 font-medium">Name</th>
+                    <th className="px-4 py-3 font-medium">Email</th>
+                    <th className="px-4 py-3 font-medium">Face samples</th>
+                    <th className="px-4 py-3 font-medium">Role</th>
+                    <th className="px-4 py-3 font-medium">Added</th>
+                    <th className="px-4 py-3 font-medium">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {usersWithFaces.length ? (
+                    usersWithFaces.map((user: UserWithFaces) => (
+                      <tr key={user.id}>
+                        <td className="px-4 py-3 font-medium">
+                          {user.name ?? "Unnamed"}
+                        </td>
+                        <td className="px-4 py-3 text-muted-foreground">
+                          {user.email}
+                        </td>
+                        <td className="px-4 py-3 text-muted-foreground">
+                          {user.faces.length}
+                        </td>
+                        <td className="px-4 py-3 capitalize">{user.role}</td>
+                        <td className="px-4 py-3 text-muted-foreground">
+                          {formatDate(user.created_at)}
+                        </td>
+                        <td className="px-4 py-3">
+                          <Link
+                            href={`/register?prefillName=${encodeURIComponent(
+                              user.name ?? ""
+                            )}&prefillEmail=${encodeURIComponent(user.email)}`}
+                            className="text-sm font-medium text-primary underline-offset-2 transition hover:underline">
+                            Add samples
+                          </Link>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td
+                        className="px-4 py-6 text-center text-muted-foreground"
+                        colSpan={6}>
+                        No users registered yet.
                       </td>
                     </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td
-                      className="px-4 py-6 text-center text-muted-foreground"
-                      colSpan={6}>
-                      No users registered yet.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </section>
 
@@ -423,9 +427,17 @@ const DashboardClient = ({ adminName, initialData }: DashboardClientProps) => {
                           type="button"
                           onClick={() => void handleDeleteSample(face.id)}
                           disabled={deletingSamples.has(face.id)}
-                          className="absolute right-2 top-2 inline-flex h-7 w-7 items-center justify-center rounded-full border border-border/80 bg-background/90 text-xs font-semibold text-destructive shadow-sm transition hover:bg-destructive hover:text-destructive-foreground disabled:cursor-not-allowed disabled:opacity-60"
+                          className="absolute right-2 top-2 inline-flex h-7 w-7 items-center justify-center rounded-full border border-border/80 bg-background/90 text-destructive shadow-sm transition hover:bg-destructive hover:text-destructive-foreground disabled:cursor-not-allowed disabled:opacity-60"
                           aria-label="Delete face sample">
-                          ×
+                          <svg
+                            className="h-3.5 w-3.5"
+                            viewBox="0 0 20 20"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round">
+                            <path d="M5 5l10 10M15 5l-10 10" />
+                          </svg>
                         </button>
                       </div>
                     ))}

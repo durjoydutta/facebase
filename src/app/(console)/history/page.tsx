@@ -32,15 +32,16 @@ const parseDate = (raw?: string | string[]): string | undefined => {
 };
 
 interface HistoryPageProps {
-  searchParams?: Record<string, string | string[] | undefined>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }
 
 const HistoryPage = async ({ searchParams }: HistoryPageProps) => {
   const { profile } = await requireAdmin();
   const supabase = getSupabaseAdminClient();
-  const status = parseStatus(searchParams?.status);
-  const from = parseDate(searchParams?.from);
-  const to = parseDate(searchParams?.to);
+  const resolvedParams = searchParams ? await searchParams : {};
+  const status = parseStatus(resolvedParams.status);
+  const from = parseDate(resolvedParams.from);
+  const to = parseDate(resolvedParams.to);
 
   let query = supabase
     .from("visits")
