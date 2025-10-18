@@ -8,6 +8,7 @@ import {
 } from "@/lib/recognitionData";
 import type { VisitStatus } from "@/lib/database.types";
 import type { SupabaseAdminClient } from "@/lib/supabaseClient";
+import { AccessControlService } from "@/lib/accessControl";
 
 const VISIT_BUCKET = "visit-snapshots";
 
@@ -173,6 +174,23 @@ export async function POST(request: NextRequest) {
     data: { publicUrl },
   } = adminClient.storage.from(VISIT_BUCKET).getPublicUrl(path);
 
+  let matchedUser: {
+    id: string;
+    name: string | null;
+    email: string;
+    is_banned: boolean;
+  } | null = null;
+
+  if (payload.matchedUserId) {
+    const { data: userRecord } = await adminClient
+      .from("users")
+      .select("id, name, email, is_banned")
+      .eq("id", payload.matchedUserId)
+      .maybeSingle();
+
+    matchedUser = userRecord ?? null;
+  }
+
   const { data: visit, error: insertError } = await adminClient
     .from("visits")
     .insert({
@@ -188,6 +206,21 @@ export async function POST(request: NextRequest) {
       { error: insertError?.message ?? "Unable to log visit." },
       { status: 500 }
     );
+  }
+
+  if (AccessControlService.isConfigured()) {
+    const decisionResult = await AccessControlService.notify({
+      status: payload.status,
+      matchedUserId: payload.matchedUserId ?? null,
+      matchedUserName: matchedUser?.name ?? null,
+      matchedUserEmail: matchedUser?.email ?? null,
+      snapshotUrl: visit.image_url ?? publicUrl,
+      banned: matchedUser?.is_banned ?? false,
+    });
+
+    if (!decisionResult.ok) {
+      console.error("Failed to dispatch access decision", decisionResult);
+    }
   }
 
   return NextResponse.json({ visit });

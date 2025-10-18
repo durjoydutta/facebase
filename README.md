@@ -89,6 +89,8 @@ The App Router groups authenticated console routes under `(console)` and public 
 | `SUPABASE_PROJECT_URL`          | ✔️       | Supabase project URL for server-side admin client (defaults to the public URL if omitted).                          |
 | `SUPABASE_SECRET_KEY`           | ✔️       | Supabase service role key for server-side operations.                                                               |
 | `NEXT_DEPLOYED_URL`             | ➖       | Optional fully-qualified deployment URL used for password reset redirects (falls back to `window.location.origin`). |
+| `RASPBERRY_PI_WEBHOOK_URL`      | ➖       | Optional URL pointing to the Raspberry Pi webhook (e.g., `http://pi.local:8080/webhook`).                           |
+| `RASPBERRY_PI_SHARED_SECRET`    | ➖       | Optional bearer token shared with the Raspberry Pi webhook server.                                                  |
 
 > **Security note:** Never expose `SUPABASE_SECRET_KEY` to the browser; it is only read in server components and API routes.
 
@@ -156,7 +158,7 @@ These files are already tracked in the repo. If you need to refresh them, downlo
 - **Frontend:** Deploy the Next.js app (e.g., Vercel). Ensure the `NEXT_PUBLIC_SUPABASE_*` variables and `NEXT_DEPLOYED_URL` are configured in the hosting environment.
 - **Backend:** Supabase handles auth, database, storage, and RLS policies. No custom server is required.
 - **Edge caching:** API routes like `/api/dashboard` are marked `force-dynamic` where necessary to ensure up-to-date data.
-- **Future hardware integrations:** `/api/recognize` and `/api/access-control` (reserved) are designed so you can forward allow/deny events to a Raspberry Pi, MQTT broker, or webhook consumer.
+- **Future hardware integrations:** `/api/recognize` forwards decisions to `/api/facebase`, which relays them to an optional Raspberry Pi webhook (see `raspberry/` for the companion server). In development the app automatically falls back to `http://localhost:8080/webhook`, so you can run both services on the same machine without extra configuration.
 
 ---
 
