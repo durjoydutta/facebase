@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import * as faceapi from "face-api.js";
+import useSWR from "swr";
 
 import FaceCard from "@/components/FaceCard";
 import WebcamCapture, { type CapturedSample } from "@/components/WebcamCapture";
@@ -157,6 +158,36 @@ const RegisterClient = ({
     });
   };
 
+  const { data: usersData } = useSWR<{ users: { id: string; name: string; email: string }[] }>(
+    "/api/users",
+    async (url: string) => {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("Failed to fetch users");
+      return res.json();
+    }
+  );
+
+  const handleUserSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const userId = e.target.value;
+    if (!userId) {
+      setIsPrefilled(false);
+      setBaselineName("");
+      setBaselineEmail("");
+      setName("");
+      setEmail("");
+      return;
+    }
+
+    const user = usersData?.users.find((u) => u.id === userId);
+    if (user) {
+      setIsPrefilled(true);
+      setBaselineName(user.name);
+      setBaselineEmail(user.email);
+      setName(user.name);
+      setEmail(user.email);
+    }
+  };
+
   return (
     <main className="mx-auto w-full max-w-5xl space-y-8 px-6 pb-16 pt-6 sm:px-10">
       <header className="space-y-2">
@@ -196,6 +227,25 @@ const RegisterClient = ({
         </section>
         <section className="rounded-2xl border border-border bg-card p-6 shadow-sm">
           <form className="space-y-6" onSubmit={handleSubmit}>
+            <div className="space-y-2">
+              <label className="text-sm font-medium" htmlFor="user-select">
+                Select Existing User (Optional)
+              </label>
+              <select
+                id="user-select"
+                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                onChange={handleUserSelect}
+                value={isPrefilled && usersData?.users.find(u => u.email === email)?.id || ""}
+              >
+                <option value="">-- Register New User --</option>
+                {usersData?.users.map((user) => (
+                  <option key={user.id} value={user.id}>
+                    {user.name} ({user.email})
+                  </option>
+                ))}
+              </select>
+            </div>
+
             <div className="space-y-2">
               <label className="text-sm font-medium" htmlFor="name">
                 Name
@@ -255,7 +305,13 @@ const RegisterClient = ({
               type="submit"
               disabled={!canSubmit}
               className="w-full rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60">
-              {isSubmitting ? "RegisteringUser..." : "Register User"}
+              {isSubmitting
+                ? isPrefilled
+                  ? "Updating User..."
+                  : "Registering User..."
+                : isPrefilled
+                  ? "Update User"
+                  : "Register User"}
             </button>
             {isPrefilled ? (
               <button

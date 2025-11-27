@@ -1,16 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import useSWR from "swr";
-import { ChevronDown, ScanFace, UserCheck, UserX } from "lucide-react";
+import { ChevronRight, MoreHorizontal, User } from "lucide-react";
 
 import type {
   DashboardData,
-  DashboardFaceRow,
   DashboardUserRow,
-  DashboardVisitRow,
 } from "@/lib/dashboardData";
 import type { VisitStatus } from "@/lib/database.types";
 
@@ -41,12 +39,8 @@ const formatDate = (iso: string) =>
 
 const AUTO_SYNC_INTERVAL_MS = 60_000;
 
-type UserDetails = DashboardUserRow & {
-  faces: DashboardFaceRow[];
-  visits: DashboardVisitRow[];
-};
-
 const DashboardClient = ({ adminName, initialData }: DashboardClientProps) => {
+  const router = useRouter();
   const {
     data,
     error: swrError,
@@ -60,15 +54,7 @@ const DashboardClient = ({ adminName, initialData }: DashboardClientProps) => {
 
   const dashboard = data ?? initialData;
   const [lastSyncedAt, setLastSyncedAt] = useState<Date>(new Date());
-  const [actionError, setActionError] = useState<string | null>(null);
   const [isManualSyncing, setIsManualSyncing] = useState(false);
-  const [deletingSamples, setDeletingSamples] = useState<Set<string>>(
-    () => new Set()
-  );
-  const [banningUsers, setBanningUsers] = useState<Set<string>>(
-    () => new Set()
-  );
-  const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
 
   useEffect(() => {
     if (data) {
@@ -86,184 +72,50 @@ const DashboardClient = ({ adminName, initialData }: DashboardClientProps) => {
     return totals;
   }, [dashboard.visits]);
 
-  const usersById = useMemo(() => {
-    const map = new Map<string, DashboardUserRow>();
-    for (const user of dashboard.users ?? []) {
-      map.set(user.id, user);
-    }
-    return map;
-  }, [dashboard.users]);
-
-  const facesByUser = useMemo(() => {
-    const map = new Map<string, DashboardFaceRow[]>();
+  const usersWithStats = useMemo(() => {
+    const users = dashboard.users ?? [];
+    const faceCounts = new Map<string, number>();
+    const facesByUser = new Map<string, string[]>();
+    const lastVisits = new Map<string, string>();
 
     for (const face of dashboard.faces ?? []) {
-      const bucket = map.get(face.user_id);
-      if (bucket) {
-        bucket.push(face);
-      } else {
-        map.set(face.user_id, [face]);
+      faceCounts.set(face.user_id, (faceCounts.get(face.user_id) ?? 0) + 1);
+      
+      const userFaces = facesByUser.get(face.user_id) ?? [];
+      if (userFaces.length < 3) {
+        userFaces.push(face.image_url);
+        facesByUser.set(face.user_id, userFaces);
       }
     }
 
-    return map;
-  }, [dashboard.faces]);
-
-  const visitsByUser = useMemo(() => {
-    const map = new Map<string, DashboardVisitRow[]>();
-
+    // Visits are ordered by timestamp desc in fetchDashboardData
     for (const visit of dashboard.visits ?? []) {
-      if (!visit.matched_user_id) {
-        continue;
-      }
-
-      const bucket = map.get(visit.matched_user_id);
-      if (bucket) {
-        bucket.push(visit);
-      } else {
-        map.set(visit.matched_user_id, [visit]);
+      if (visit.matched_user_id && !lastVisits.has(visit.matched_user_id)) {
+        lastVisits.set(visit.matched_user_id, visit.timestamp);
       }
     }
-
-    return map;
-  }, [dashboard.visits]);
-
-  const usersWithDetails = useMemo<UserDetails[]>(() => {
-    const users = dashboard.users ?? [];
 
     return users.map((user) => ({
       ...user,
-      faces: facesByUser.get(user.id) ?? [],
-      visits: visitsByUser.get(user.id) ?? [],
+      faceCount: faceCounts.get(user.id) ?? 0,
+      recentFaces: facesByUser.get(user.id) ?? [],
+      lastSeen: lastVisits.get(user.id) ?? null,
     }));
-  }, [dashboard.users, facesByUser, visitsByUser]);
-
-  const usersWithSamples = useMemo<UserDetails[]>(() => {
-    return usersWithDetails.filter((user) => user.faces.length > 0);
-  }, [usersWithDetails]);
+  }, [dashboard]);
 
   const handleManualSync = useCallback(async () => {
     try {
       setIsManualSyncing(true);
-      setActionError(null);
       await mutate(undefined, { revalidate: true });
     } catch (error) {
-      setActionError(
-        error instanceof Error
-          ? error.message
-          : "Failed to refresh dashboard data."
-      );
+      console.error("Failed to refresh dashboard data", error);
     } finally {
       setIsManualSyncing(false);
     }
   }, [mutate]);
 
-  const handleDeleteSample = useCallback(
-    async (faceId: string) => {
-      if (!faceId) {
-        return;
-      }
-
-      setActionError(null);
-      setDeletingSamples((previous) => {
-        const clone = new Set(previous);
-        clone.add(faceId);
-        return clone;
-      });
-
-      try {
-        const response = await fetch(`/api/faces/${faceId}`, {
-          method: "DELETE",
-        });
-
-        if (!response.ok) {
-          const payload = (await response.json().catch(() => null)) as {
-            error?: string;
-          } | null;
-
-          throw new Error(payload?.error ?? "Failed to delete face sample.");
-        }
-
-        await mutate(undefined, { revalidate: true });
-      } catch (error) {
-        setActionError(
-          error instanceof Error
-            ? error.message
-            : "Unable to delete face sample."
-        );
-      } finally {
-        setDeletingSamples((previous) => {
-          const clone = new Set(previous);
-          clone.delete(faceId);
-          return clone;
-        });
-      }
-    },
-    [mutate]
-  );
-
-  const handleToggleBan = useCallback(
-    async (userId: string, nextState: boolean) => {
-      if (!userId) {
-        return;
-      }
-
-      setActionError(null);
-      setBanningUsers((previous) => {
-        const clone = new Set(previous);
-        clone.add(userId);
-        return clone;
-      });
-
-      try {
-        const response = await fetch(`/api/users/${userId}/ban`, {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ isBanned: nextState }),
-        });
-
-        if (!response.ok) {
-          const payload = (await response.json().catch(() => null)) as {
-            error?: string;
-          } | null;
-
-          throw new Error(payload?.error ?? "Failed to update ban status.");
-        }
-
-        await mutate(undefined, { revalidate: true });
-      } catch (error) {
-        setActionError(
-          error instanceof Error
-            ? error.message
-            : "Unable to update ban status."
-        );
-      } finally {
-        setBanningUsers((previous) => {
-          const clone = new Set(previous);
-          clone.delete(userId);
-          return clone;
-        });
-      }
-    },
-    [mutate]
-  );
-
-  const toggleExpandedUser = useCallback((userId: string) => {
-    setExpandedUserId((previous) => (previous === userId ? null : userId));
-  }, []);
-
   const totalUsers = dashboard.users?.length ?? 0;
   const totalFaceSamples = dashboard.faces?.length ?? 0;
-  const totalVisits = dashboard.visits?.length ?? 0;
-  const recentVisits = useMemo(() => {
-    if (!dashboard.visits) {
-      return [];
-    }
-
-    return dashboard.visits.slice(0, 10);
-  }, [dashboard.visits]);
 
   const lastSyncedLabel = useMemo(
     () => formatDate(lastSyncedAt.toISOString()),
@@ -271,14 +123,13 @@ const DashboardClient = ({ adminName, initialData }: DashboardClientProps) => {
   );
 
   return (
-    <main className="space-y-10">
+    <main className="space-y-8 pb-10">
       <header className="mx-auto w-full max-w-6xl px-6 sm:px-10">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <h1 className="text-3xl font-semibold tracking-tight">Dashboard</h1>
             <p className="text-sm text-muted-foreground">
-              Welcome back, {adminName}. Monitor usage, review visits, and
-              manage your roster.
+              Welcome back, {adminName}. Overview of your secure facility.
             </p>
           </div>
           <div className="flex flex-col items-start gap-2 text-xs text-muted-foreground sm:items-end">
@@ -288,7 +139,6 @@ const DashboardClient = ({ adminName, initialData }: DashboardClientProps) => {
                 {lastSyncedLabel}
               </span>
             </span>
-            <span>Auto-sync every {AUTO_SYNC_INTERVAL_MS / 1000}s</span>
             <button
               type="button"
               onClick={handleManualSync}
@@ -303,348 +153,199 @@ const DashboardClient = ({ adminName, initialData }: DashboardClientProps) => {
             {swrError.message}
           </p>
         ) : null}
-        {actionError ? (
-          <p className="mt-2 rounded-2xl border border-destructive bg-destructive/10 px-4 py-3 text-sm text-destructive">
-            {actionError}
-          </p>
-        ) : null}
       </header>
 
-      <div className="mx-auto w-full max-w-6xl space-y-10 px-6 sm:px-10">
+      <div className="mx-auto w-full max-w-6xl space-y-8 px-6 sm:px-10">
         <section>
-          <h2 className="text-lg font-semibold">Overview</h2>
-          <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
-              <p className="text-sm text-muted-foreground">Registered users</p>
-              <p className="mt-2 text-3xl font-semibold">{totalUsers}</p>
-            </div>
-            <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
-              <p className="text-sm text-muted-foreground">
-                Recent visits accepted
-              </p>
-              <p className="mt-2 text-3xl font-semibold">{statuses.accepted}</p>
-            </div>
-            <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
-              <p className="text-sm text-muted-foreground">
-                Recent visits rejected
-              </p>
-              <p className="mt-2 text-3xl font-semibold">{statuses.rejected}</p>
-            </div>
-            <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
-              <p className="text-sm text-muted-foreground">
-                Face samples stored
-              </p>
-              <p className="mt-2 text-3xl font-semibold">{totalFaceSamples}</p>
-            </div>
-          </div>
-        </section>
-
-        <section className="space-y-4">
-          <header className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold">Recent activity</h2>
-            <p className="text-xs text-muted-foreground">
-              Showing last {recentVisits.length} events.
-            </p>
-          </header>
-          <div className="rounded-2xl border border-border bg-card shadow-sm">
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-border text-left text-sm">
-                <thead className="bg-muted/40 text-muted-foreground">
-                  <tr>
-                    <th className="px-4 py-3 font-medium">Status</th>
-                    <th className="px-4 py-3 font-medium">Timestamp</th>
-                    <th className="px-4 py-3 font-medium">Matched user</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {recentVisits.length ? (
-                    recentVisits.map((visit: DashboardVisitRow) => {
-                      const matchedUser = visit.matched_user_id
-                        ? usersById.get(visit.matched_user_id)
-                        : null;
-
-                      return (
-                        <tr key={visit.id}>
-                          <td className="px-4 py-3 font-medium capitalize">
-                            {visit.status}
-                          </td>
-                          <td className="px-4 py-3 text-muted-foreground">
-                            {formatDate(visit.timestamp)}
-                          </td>
-                          <td className="px-4 py-3 text-muted-foreground">
-                            {matchedUser?.name ?? "Unknown"}
-                          </td>
-                        </tr>
-                      );
-                    })
-                  ) : (
-                    <tr>
-                      <td
-                        className="px-4 py-6 text-center text-muted-foreground"
-                        colSpan={3}>
-                        No visits recorded yet.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </section>
-
-        <section className="space-y-4">
-          <header className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="text-lg font-semibold">User roster</h2>
-              <p className="text-sm text-muted-foreground">
-                Latest registered users listed first.
-              </p>
-            </div>
-          </header>
-          {usersWithDetails.length ? (
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-              {usersWithDetails.map((user) => {
-                const isExpanded = expandedUserId === user.id;
-                const visitPreviews = user.visits.slice(0, 4);
-
-                return (
-                  <article
-                    key={user.id}
-                    className={`rounded-2xl border p-5 shadow-sm transition ${
-                      user.is_banned
-                        ? "border-destructive/60 bg-destructive/5"
-                        : "border-border bg-card"
-                    }`}>
-                    <div className="flex items-start gap-3">
-                      <button
-                        type="button"
-                        onClick={() => toggleExpandedUser(user.id)}
-                        className="flex flex-1 items-start justify-between gap-3 text-left">
-                        <div>
-                          <p className="text-base font-semibold leading-tight">
-                            {user.name ?? "Unnamed"}
-                          </p>
-                          <p className="break-all text-xs text-muted-foreground">
-                            {user.email}
-                          </p>
-                          <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-                            <span className="rounded-full border border-border px-2.5 py-0.5 uppercase tracking-[0.18em]">
-                              {user.role}
-                            </span>
-                            <span>
-                              {user.faces.length} sample
-                              {user.faces.length === 1 ? "" : "s"}
-                            </span>
-                            <span>Joined {formatDate(user.created_at)}</span>
-                          </div>
-                        </div>
-                        <ChevronDown
-                          className={`mt-1 h-4 w-4 shrink-0 transition-transform duration-200 ${
-                            isExpanded ? "rotate-180" : ""
-                          }`}
-                        />
-                      </button>
-                      <div className="flex items-center gap-2">
-                        <Link
-                          href={`/register?prefillName=${encodeURIComponent(
-                            user.name ?? ""
-                          )}&prefillEmail=${encodeURIComponent(user.email)}`}
-                          className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-border bg-background text-foreground shadow-sm transition hover:border-primary/70 hover:text-primary"
-                          aria-label={`Add new samples for ${
-                            user.name ?? "member"
-                          }`}>
-                          <ScanFace className="h-4 w-4" />
-                          <span className="sr-only">Add Samples</span>
-                        </Link>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            void handleToggleBan(user.id, !user.is_banned)
-                          }
-                          disabled={banningUsers.has(user.id)}
-                          className={`inline-flex h-9 w-9 items-center justify-center rounded-full border bg-background shadow-sm transition ${
-                            user.is_banned
-                              ? "border-destructive/70 text-destructive hover:bg-destructive hover:text-destructive-foreground"
-                              : "border-border text-muted-foreground hover:border-destructive/60 hover:text-destructive"
-                          } disabled:cursor-not-allowed disabled:opacity-60`}
-                          aria-label={
-                            user.is_banned
-                              ? `Unban ${user.name ?? "member"}`
-                              : `Ban ${user.name ?? "member"}`
-                          }>
-                          {user.is_banned ? (
-                            <UserCheck className="h-4 w-4" />
-                          ) : (
-                            <UserX className="h-4 w-4" />
-                          )}
-                          <span className="sr-only">
-                            {user.is_banned ? "UnbanUser" : "BanUser"}
-                          </span>
-                        </button>
-                      </div>
-                    </div>
-                    {user.is_banned ? (
-                      <p className="mt-3 rounded-full border border-destructive/60 bg-destructive/10 px-3 py-1 text-xs font-medium text-destructive">
-                        Banned members are automatically rejected during
-                        recognition.
-                      </p>
-                    ) : null}
-                    {isExpanded ? (
-                      <div className="mt-4 border-t border-border pt-4">
-                        <div className="flex items-center justify-between gap-2">
-                          <h3 className="text-sm font-semibold">
-                            Recent visits
-                          </h3>
-                          <span className="text-xs text-muted-foreground">
-                            {visitPreviews.length
-                              ? `Showing ${visitPreviews.length} snapshot${
-                                  visitPreviews.length === 1 ? "" : "s"
-                                }`
-                              : "No snapshots yet"}
-                          </span>
-                        </div>
-                        {visitPreviews.length ? (
-                          <div className="mt-3 grid grid-cols-2 gap-3">
-                            {visitPreviews.map((visit) => (
-                              <div key={visit.id} className="space-y-2">
-                                <div className="relative h-28 overflow-hidden rounded-xl border border-border/60 bg-muted">
-                                  {visit.image_url ? (
-                                    <Image
-                                      src={visit.image_url}
-                                      alt={`Visit snapshot for ${
-                                        user.name ?? "member"
-                                      }`}
-                                      fill
-                                      className="object-cover"
-                                      sizes="(max-width: 640px) 50vw, 220px"
-                                    />
-                                  ) : (
-                                    <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
-                                      No snapshot
-                                    </div>
-                                  )}
-                                </div>
-                                <div className="text-[11px] leading-tight text-muted-foreground">
-                                  <p>{formatDate(visit.timestamp)}</p>
-                                  <p
-                                    className={`font-medium ${
-                                      visit.status === "accepted"
-                                        ? "text-emerald-500"
-                                        : "text-destructive"
-                                    }`}>
-                                    {visit.status}
-                                  </p>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <p className="mt-3 text-sm text-muted-foreground">
-                            No recognition events recorded for this member yet.
-                          </p>
-                        )}
-                      </div>
-                    ) : null}
-                  </article>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="rounded-2xl border border-dashed border-border/80 bg-card p-10 text-center text-sm text-muted-foreground">
-              No users registered yet.
-            </div>
-          )}
-        </section>
-
-        <section className="space-y-4">
-          <header className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="text-lg font-semibold">Face library</h2>
-              <p className="text-sm text-muted-foreground">
-                Preview and manage captured reference images per user.
-              </p>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {isValidating ? "Syncing latest samples..." : "Up to date."}
-            </p>
-          </header>
-          {usersWithSamples.length ? (
-            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-              {usersWithSamples.map((user: UserDetails) => (
-                <article
-                  key={user.id}
-                  className="flex h-full flex-col justify-between rounded-2xl border border-border bg-card p-6 shadow-sm">
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <h3 className="text-base font-semibold">
-                        {user.name ?? "Unnamed"}
-                      </h3>
-                      <p className="text-xs text-muted-foreground">
-                        {user.faces.length} sample
-                        {user.faces.length === 1 ? "" : "s"} captured
-                      </p>
-                    </div>
-                    <div className="flex flex-col items-end gap-2 text-xs">
-                      <span className="rounded-full border border-border px-3 py-1 uppercase tracking-[0.2em] text-muted-foreground">
-                        {user.role}
-                      </span>
-                      <Link
-                        href={`/register?prefillName=${encodeURIComponent(
-                          user.name ?? ""
-                        )}&prefillEmail=${encodeURIComponent(user.email)}`}
-                        className="font-medium text-primary underline-offset-2 transition hover:underline">
-                        Add Samples
-                      </Link>
-                    </div>
-                  </div>
-                  <div className="mt-4 grid grid-cols-3 gap-3">
-                    {user.faces.slice(0, 3).map((face: DashboardFaceRow) => (
-                      <div
-                        key={face.id}
-                        className="group relative h-24 overflow-hidden rounded-xl border border-border/60 bg-muted">
-                        <Image
-                          src={face.image_url}
-                          alt={`Face sample of ${user.name ?? "user"}`}
-                          fill
-                          className="object-cover transition group-hover:scale-105"
-                          sizes="(max-width: 640px) 33vw, (max-width: 1024px) 20vw, 180px"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => void handleDeleteSample(face.id)}
-                          disabled={deletingSamples.has(face.id)}
-                          className="absolute right-2 top-2 inline-flex h-7 w-7 items-center justify-center rounded-full border border-border/80 bg-background/90 text-destructive shadow-sm transition hover:bg-destructive hover:text-destructive-foreground disabled:cursor-not-allowed disabled:opacity-60"
-                          aria-label="Delete face sample">
-                          <svg
-                            className="h-3.5 w-3.5"
-                            viewBox="0 0 20 20"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round">
-                            <path d="M5 5l10 10M15 5l-10 10" />
-                          </svg>
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                  {user.faces.length > 3 ? (
-                    <p className="mt-3 text-xs text-muted-foreground">
-                      +{user.faces.length - 3} more sample
-                      {user.faces.length - 3 === 1 ? "" : "s"} stored
-                    </p>
-                  ) : null}
-                  <p className="mt-4 text-xs text-muted-foreground">
-                    Last updated{" "}
-                    {formatDate(user.faces[0]?.created_at ?? user.created_at)}
+          <h2 className="sr-only">Statistics</h2>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
+              <div className="flex items-center gap-4">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
+                  <User className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">
+                    Total Users
                   </p>
-                </article>
+                  <p className="text-2xl font-bold">{totalUsers}</p>
+                </div>
+              </div>
+            </div>
+            <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
+              <div className="flex items-center gap-4">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-500">
+                  <svg
+                    className="h-5 w-5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth="2">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">
+                    Access Granted (24h)
+                  </p>
+                  <p className="text-2xl font-bold">
+                    {dashboard.stats?.accepted24h ?? 0}
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
+              <div className="flex items-center gap-4">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-500/10 text-red-500">
+                  <svg
+                    className="h-5 w-5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth="2">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                    />
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">
+                    Access Denied (24h)
+                  </p>
+                  <p className="text-2xl font-bold">
+                    {dashboard.stats?.rejected24h ?? 0}
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
+              <div className="flex items-center gap-4">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-500/10 text-blue-500">
+                  <svg
+                    className="h-5 w-5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth="2">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                    />
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">
+                    Face Samples
+                  </p>
+                  <p className="text-2xl font-bold">{totalFaceSamples}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="space-y-6">
+          <header className="flex items-center justify-between border-b border-border pb-4">
+            <div>
+              <h2 className="text-lg font-semibold">Users</h2>
+              <p className="text-sm text-muted-foreground">
+                Manage access and view individual history.
+              </p>
+            </div>
+          </header>
+          
+          {usersWithStats.length ? (
+            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              {usersWithStats.map((user) => (
+                <Link
+                  key={user.id}
+                  href={`/users/${user.id}`}
+                  className="group relative flex flex-col overflow-hidden rounded-2xl border border-border bg-card transition hover:border-primary/50 hover:shadow-md">
+                  <div className="flex flex-1 flex-col p-6">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                          <User className="h-6 w-6" />
+                        </div>
+                        <div>
+                          <div className="font-semibold text-foreground">
+                            {user.name ?? "Unnamed"}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {user.email}
+                          </div>
+                        </div>
+                      </div>
+                      {user.is_banned ? (
+                        <span className="inline-flex items-center rounded-full bg-destructive/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-destructive">
+                          Banned
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-600">
+                          Active
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="mt-6 flex items-center justify-between text-xs text-muted-foreground">
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-medium text-foreground">
+                          {user.role}
+                        </span>
+                      </div>
+                      <div>
+                        Last seen:{" "}
+                        <span className="font-medium text-foreground">
+                          {user.lastSeen ? formatDate(user.lastSeen) : "Never"}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Face Thumbnails */}
+                    <div className="mt-6 flex items-center gap-2">
+                      {user.recentFaces.length > 0 ? (
+                        user.recentFaces.map((faceUrl, idx) => (
+                          <div
+                            key={idx}
+                            className="relative h-10 w-10 overflow-hidden rounded-lg border border-border bg-muted">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={faceUrl}
+                              alt="Face sample"
+                              className="h-full w-full object-cover"
+                            />
+                          </div>
+                        ))
+                      ) : (
+                        <span className="text-xs text-muted-foreground">
+                          No face samples
+                        </span>
+                      )}
+                      {user.faceCount > 3 && (
+                        <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-muted text-xs font-medium text-muted-foreground">
+                          +{user.faceCount - 3}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center justify-between border-t border-border bg-muted/30 px-6 py-3 text-xs font-medium text-muted-foreground group-hover:bg-primary/5 group-hover:text-primary">
+                    <span>View Details</span>
+                    <ChevronRight className="h-4 w-4" />
+                  </div>
+                </Link>
               ))}
             </div>
           ) : (
-            <div className="rounded-2xl border border-dashed border-border/80 bg-card p-10 text-center text-sm text-muted-foreground">
-              No face samples uploaded yet. Use the register flow to capture
-              embeddings.
+            <div className="rounded-xl border border-dashed border-border p-12 text-center text-muted-foreground">
+              No users found.
             </div>
           )}
         </section>

@@ -126,16 +126,52 @@ const WebcamCapture = ({
 
         if (result) {
           const { box } = result;
-          const scaleX = displayWidth / video.videoWidth;
-          const scaleY = displayHeight / video.videoHeight;
-          const drawX = box.x * scaleX;
-          const drawY = box.y * scaleY;
-          const drawWidth = box.width * scaleX;
-          const drawHeight = box.height * scaleY;
+          const videoRatio = video.videoWidth / video.videoHeight;
+          const displayRatio = displayWidth / displayHeight;
 
+          let scale = 1;
+          let offsetX = 0;
+          let offsetY = 0;
+
+          if (displayRatio > videoRatio) {
+            // Display is wider than video: crop top/bottom
+            scale = displayWidth / video.videoWidth;
+            offsetY = (displayHeight - video.videoHeight * scale) / 2;
+          } else {
+            // Display is taller than video: crop left/right
+            scale = displayHeight / video.videoHeight;
+            offsetX = (displayWidth - video.videoWidth * scale) / 2;
+          }
+
+          const drawX = box.x * scale + offsetX;
+          const drawY = box.y * scale + offsetY;
+          const drawWidth = box.width * scale;
+          const drawHeight = box.height * scale;
+
+          // Draw corners instead of full box for a cleaner look
+          const cornerSize = 20;
           context.strokeStyle = "#2563eb";
-          context.lineWidth = 4;
-          context.strokeRect(drawX, drawY, drawWidth, drawHeight);
+          context.lineWidth = 3;
+          context.setLineDash([]); // Reset dash for corners if needed, or use solid
+
+          context.beginPath();
+          // Top-left
+          context.moveTo(drawX, drawY + cornerSize);
+          context.lineTo(drawX, drawY);
+          context.lineTo(drawX + cornerSize, drawY);
+          // Top-right
+          context.moveTo(drawX + drawWidth - cornerSize, drawY);
+          context.lineTo(drawX + drawWidth, drawY);
+          context.lineTo(drawX + drawWidth, drawY + cornerSize);
+          // Bottom-right
+          context.moveTo(drawX + drawWidth, drawY + drawHeight - cornerSize);
+          context.lineTo(drawX + drawWidth, drawY + drawHeight);
+          context.lineTo(drawX + drawWidth - cornerSize, drawY + drawHeight);
+          // Bottom-left
+          context.moveTo(drawX + cornerSize, drawY + drawHeight);
+          context.lineTo(drawX, drawY + drawHeight);
+          context.lineTo(drawX, drawY + drawHeight - cornerSize);
+          context.stroke();
         }
       } catch (error) {
         // ignore transient detection failures

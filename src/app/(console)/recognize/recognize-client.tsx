@@ -125,35 +125,70 @@ const RecognizeClient = ({ adminName, initialFaces }: RecognizeClientProps) => {
       overlay.height = displayHeight;
       context.clearRect(0, 0, overlay.width, overlay.height);
 
-      const stroke = recognized ? "#22c55e" : "#ef4444";
-      context.strokeStyle = stroke;
-      context.lineWidth = 5;
-      const scaleX = displayWidth / video.videoWidth;
-      const scaleY = displayHeight / video.videoHeight;
-      const drawX = box.x * scaleX;
-      const drawY = box.y * scaleY;
-      const drawWidth = box.width * scaleX;
-      const drawHeight = box.height * scaleY;
-      context.strokeRect(drawX, drawY, drawWidth, drawHeight);
+      const videoRatio = video.videoWidth / video.videoHeight;
+      const displayRatio = displayWidth / displayHeight;
 
+      let scale = 1;
+      let offsetX = 0;
+      let offsetY = 0;
+
+      if (displayRatio > videoRatio) {
+        // Display is wider than video: crop top/bottom
+        scale = displayWidth / video.videoWidth;
+        offsetY = (displayHeight - video.videoHeight * scale) / 2;
+      } else {
+        // Display is taller than video: crop left/right
+        scale = displayHeight / video.videoHeight;
+        offsetX = (displayWidth - video.videoWidth * scale) / 2;
+      }
+
+
+      const stroke = recognized ? "#10b981" : "#ef4444"; // Emerald-500 : Red-500
+      context.strokeStyle = stroke;
+      context.lineWidth = 2;
+      context.setLineDash([10, 5]); // Dashed line for tech feel
+
+      const drawX = box.x * scale + offsetX;
+      const drawY = box.y * scale + offsetY;
+      const drawWidth = box.width * scale;
+      const drawHeight = box.height * scale;
+
+      // Draw corners instead of full box for a cleaner look
+      const cornerSize = 20;
+      context.beginPath();
+      // Top-left
+      context.moveTo(drawX, drawY + cornerSize);
+      context.lineTo(drawX, drawY);
+      context.lineTo(drawX + cornerSize, drawY);
+      // Top-right
+      context.moveTo(drawX + drawWidth - cornerSize, drawY);
+      context.lineTo(drawX + drawWidth, drawY);
+      context.lineTo(drawX + drawWidth, drawY + cornerSize);
+      // Bottom-right
+      context.moveTo(drawX + drawWidth, drawY + drawHeight - cornerSize);
+      context.lineTo(drawX + drawWidth, drawY + drawHeight);
+      context.lineTo(drawX + drawWidth - cornerSize, drawY + drawHeight);
+      // Bottom-left
+      context.moveTo(drawX + cornerSize, drawY + drawHeight);
+      context.lineTo(drawX, drawY + drawHeight);
+      context.lineTo(drawX, drawY + drawHeight - cornerSize);
+      context.stroke();
+
+      // Label background
       const displayLabel =
-        label.trim() || (recognized ? "Recognized" : "Unknown");
-      context.font = "32px sans-serif";
+        label.trim() || (recognized ? "RECOGNIZED" : "UNKNOWN");
+      context.font = "600 14px 'Inter', sans-serif";
       context.textBaseline = "top";
-      const paddingX = 12;
-      const paddingY = 6;
+      const paddingX = 8;
+      const paddingY = 4;
       const metrics = context.measureText(displayLabel);
       const textWidth = metrics.width;
-      const labelX = Math.max(
-        0,
-        Math.min(drawX, overlay.width - textWidth - paddingX * 2)
-      );
-      const labelY = Math.max(0, drawY - 36);
+      const labelX = drawX;
+      const labelY = drawY - 28;
 
-      context.fillStyle = recognized
-        ? "rgba(34,197,94,0.85)"
-        : "rgba(239,68,68,0.85)";
-      context.fillRect(labelX, labelY, textWidth + paddingX * 2, 36);
+      context.fillStyle = recognized ? "#10b981" : "#ef4444";
+      context.fillRect(labelX, labelY, textWidth + paddingX * 2, 24);
+      
       context.fillStyle = "#ffffff";
       context.fillText(displayLabel, labelX + paddingX, labelY + paddingY);
     },
@@ -603,192 +638,237 @@ const RecognizeClient = ({ adminName, initialFaces }: RecognizeClientProps) => {
   );
 
   return (
-    <main className="space-y-10">
+    <main className="space-y-8 pb-10">
       <header className="mx-auto w-full max-w-6xl px-6 sm:px-10">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-3xl font-semibold tracking-tight">
-              Recognition
-            </h1>
+            <div className="flex items-center gap-3">
+              <h1 className="text-3xl font-bold tracking-tight">
+                Live Recognition
+              </h1>
+              <span className="relative flex h-3 w-3">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex h-3 w-3 rounded-full bg-emerald-500"></span>
+              </span>
+            </div>
             <p className="text-sm text-muted-foreground">
-              Welcome back, {adminName}. Keep the stream running to grant or
-              deny access in real time.
-            </p>
-            <p className="text-xs text-muted-foreground">
-              Loaded embeddings: {faceCount}. Model status:{" "}
-              {modelsLoaded ? "ready" : "loading"}.
+              Real-time access control monitoring.
             </p>
           </div>
-          <div className="flex flex-col items-start gap-2 text-xs text-muted-foreground sm:items-end">
-            <span>
-              Last synced:{" "}
-              <span className="font-medium text-foreground">
-                {lastSyncedLabel}
-              </span>
-            </span>
-            <span>Auto-sync every {AUTO_SYNC_INTERVAL_MS / 1000}s</span>
+          <div className="flex items-center gap-4">
+            <div className="text-right text-xs text-muted-foreground">
+              <p>Database: <span className="font-medium text-foreground">{faceCount} faces</span></p>
+              <p>Last synced: {lastSyncedLabel}</p>
+            </div>
             <button
               type="button"
               onClick={() => void handleManualSync()}
               disabled={isManualSyncing}
-              className="mt-1 inline-flex items-center gap-2 rounded-full border border-border bg-background px-4 py-2 text-xs font-medium text-foreground transition hover:border-primary/80 hover:text-primary disabled:cursor-not-allowed disabled:opacity-60">
-              {isManualSyncing ? "Syncing..." : "Sync embeddings"}
+              className="inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-4 text-xs font-medium transition hover:bg-accent hover:text-accent-foreground disabled:opacity-50">
+              {isManualSyncing ? "Syncing..." : "Sync Now"}
             </button>
           </div>
         </div>
-        {facesError ? (
-          <p className="mt-4 rounded-2xl border border-destructive bg-destructive/10 px-4 py-3 text-sm text-destructive">
-            {facesError.message}
-          </p>
-        ) : null}
-        {actionError ? (
-          <p className="mt-2 rounded-2xl border border-destructive bg-destructive/10 px-4 py-3 text-sm text-destructive">
-            {actionError}
-          </p>
-        ) : null}
-        {cameraError ? (
-          <p className="mt-2 rounded-2xl border border-destructive bg-destructive/10 px-4 py-3 text-sm text-destructive">
-            {cameraError}
-          </p>
-        ) : null}
-        {statusMessage ? (
-          <p className="mt-2 rounded-2xl border border-primary bg-primary/10 px-4 py-3 text-sm text-primary">
-            {statusMessage}
-          </p>
-        ) : null}
+        
+        {/* Status Messages */}
+        <div className="mt-4 space-y-2">
+           {facesError && (
+            <div className="rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-2 text-sm text-destructive">
+              {facesError.message}
+            </div>
+          )}
+          {actionError && (
+            <div className="rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-2 text-sm text-destructive">
+              {actionError}
+            </div>
+          )}
+          {cameraError && (
+            <div className="rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-2 text-sm text-destructive">
+              {cameraError}
+            </div>
+          )}
+        </div>
       </header>
 
-      <div className="mx-auto grid w-full max-w-6xl gap-6 px-6 pb-16 sm:px-10 lg:grid-cols-[minmax(0,420px)_1fr]">
-        <section className="space-y-4 rounded-2xl border border-border bg-card p-6 shadow-sm">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold">Live feed</h2>
-            <button
-              type="button"
-              onClick={() => setIsWatching((previous) => !previous)}
-              className="rounded-full border border-border px-4 py-2 text-xs font-medium text-foreground transition hover:border-primary/80 hover:text-primary">
-              {isWatching ? "Pause recognition" : "Resume recognition"}
-            </button>
-          </div>
-          {loadingMessage ? (
-            <p className="text-sm text-muted-foreground">{loadingMessage}</p>
-          ) : null}
-          <div className="relative overflow-hidden rounded-2xl border border-border bg-muted/40">
+      <div className="mx-auto grid w-full max-w-6xl gap-6 px-6 sm:px-10 lg:grid-cols-[1fr_350px]">
+        {/* Main Video Feed */}
+        <section className="relative overflow-hidden rounded-3xl border border-border bg-black shadow-2xl h-full">
+          <div className="relative h-full w-full overflow-hidden">
             <video
               ref={videoRef}
               autoPlay
               playsInline
               muted
-              className="h-[280px] w-full bg-black object-cover"
+              className={`h-full w-full object-cover transition-opacity duration-700 ${
+                modelsLoaded ? "opacity-100" : "opacity-0"
+              }`}
             />
             <canvas
               ref={overlayRef}
               className="pointer-events-none absolute inset-0 h-full w-full"
             />
-            {isValidating ? (
-              <span className="absolute right-3 top-3 rounded-full bg-background/80 px-3 py-1 text-xs font-medium text-muted-foreground">
-                Syncing embeddings...
-              </span>
-            ) : null}
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Position the visitor where lighting is even. Recognition triggers
-            once a stable face descriptor is generated.
-          </p>
-          <canvas ref={canvasRef} className="hidden" />
-        </section>
-
-        <section className="space-y-6">
-          <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
-            <h2 className="text-lg font-semibold">Current status</h2>
-            {liveMatch ? (
-              <div className="mt-4 space-y-2">
-                <p
-                  className={`text-sm font-medium ${
-                    liveMatch.isBanned
-                      ? "text-destructive"
-                      : liveMatch.status === "accepted"
-                      ? "text-emerald-500"
-                      : "text-muted-foreground"
-                  }`}>
-                  {liveMatch.statusLabel}
-                </p>
-                <p className="text-2xl font-semibold tracking-tight">
-                  {liveMatch.userName}
-                </p>
-                {liveMatch.userEmail ? (
-                  <p className="text-sm text-muted-foreground">
-                    {liveMatch.userEmail}
-                  </p>
-                ) : null}
-                {liveMatch.isBanned ? (
-                  <p className="rounded-full border border-destructive/50 bg-destructive/10 px-3 py-1 text-xs font-medium text-destructive">
-                    Banned user
-                  </p>
-                ) : null}
-                <p className="text-xs text-muted-foreground">
-                  Distance:{" "}
-                  {liveMatch.distance !== null
-                    ? liveMatch.distance.toFixed(3)
-                    : "n/a"}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  Updated {new Date(liveMatch.capturedAt).toLocaleTimeString()}
-                </p>
+            
+            {/* Scanning Animation Overlay */}
+            {isWatching && modelsLoaded && (
+              <div className="pointer-events-none absolute inset-0 overflow-hidden opacity-20">
+                <div className="h-full w-full animate-[scan_3s_ease-in-out_infinite] bg-gradient-to-b from-transparent via-emerald-500/10 to-transparent" />
               </div>
-            ) : (
-              <p className="mt-4 text-sm text-muted-foreground">
-                Awaiting a clear face in view.
-              </p>
+            )}
+
+            {/* Viewfinder Corners */}
+            <div className="pointer-events-none absolute inset-0 p-6">
+              <div className="h-full w-full border-[1px] border-white/10">
+                <div className="absolute left-0 top-0 h-8 w-8 border-l-2 border-t-2 border-white/50" />
+                <div className="absolute right-0 top-0 h-8 w-8 border-r-2 border-t-2 border-white/50" />
+                <div className="absolute bottom-0 left-0 h-8 w-8 border-b-2 border-l-2 border-white/50" />
+                <div className="absolute bottom-0 right-0 h-8 w-8 border-b-2 border-r-2 border-white/50" />
+              </div>
+            </div>
+
+            {/* Loading State */}
+            {!modelsLoaded && (
+              <div className="absolute inset-0 flex items-center justify-center bg-zinc-900">
+                <div className="flex flex-col items-center gap-4">
+                  <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+                  <p className="text-sm font-medium text-muted-foreground">
+                    Initializing neural networks...
+                  </p>
+                </div>
+              </div>
             )}
           </div>
 
-          <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold">Event log</h2>
-              <span className="text-xs text-muted-foreground">
-                {events.length} event{events.length === 1 ? "" : "s"} this
-                session
+          {/* Controls Bar */}
+          <div className="absolute bottom-0 left-0 right-0 flex items-center justify-between border-t border-white/10 bg-zinc-900/50 px-6 py-4 backdrop-blur-md">
+            <div className="flex items-center gap-2">
+              <div className={`h-2 w-2 rounded-full ${isWatching ? "bg-emerald-500 animate-pulse" : "bg-yellow-500"}`} />
+              <span className="text-xs font-medium text-zinc-400">
+                {isWatching ? "SYSTEM ACTIVE" : "SYSTEM PAUSED"}
               </span>
             </div>
-            {events.length ? (
-              <ul className="mt-4 space-y-3 text-sm">
-                {events.map((event) => (
-                  <li
-                    key={event.id}
-                    className="flex flex-col gap-1 rounded-xl border border-border/60 bg-background/80 px-4 py-3">
-                    <div className="flex items-center justify-between">
-                      <span className="font-semibold capitalize">
-                        {event.status}
-                      </span>
-                      <span className="text-xs text-muted-foreground">
-                        {new Date(event.timestamp).toLocaleTimeString()}
-                      </span>
-                    </div>
-                    <p className="text-sm text-foreground">{event.message}</p>
-                    {event.isBanned ? (
-                      <span className="inline-flex w-fit items-center gap-1 rounded-full border border-destructive/60 bg-destructive/10 px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-destructive">
-                        Banned
-                      </span>
-                    ) : null}
-                    {event.distance !== undefined ? (
-                      <p className="text-xs text-muted-foreground">
-                        Distance:{" "}
-                        {event.distance !== null
-                          ? event.distance.toFixed(3)
-                          : "n/a"}
-                      </p>
-                    ) : null}
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="mt-4 text-sm text-muted-foreground">
-                No recognition events logged yet this session.
-              </p>
-            )}
+            <button
+              onClick={() => setIsWatching((prev) => !prev)}
+              className="rounded-full bg-white/10 px-4 py-1.5 text-xs font-medium text-white transition hover:bg-white/20">
+              {isWatching ? "Pause" : "Resume"}
+            </button>
           </div>
         </section>
+
+        {/* Sidebar */}
+        <aside className="flex flex-col gap-6 h-full">
+          {/* Current Match Card */}
+          <div className="flex-1 overflow-hidden rounded-2xl border border-border bg-card shadow-sm min-h-[320px]">
+            <div className="border-b border-border bg-muted/50 px-4 py-3">
+              <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Identification Status
+              </h2>
+            </div>
+            <div className="flex h-full flex-col justify-center p-6">
+              {liveMatch ? (
+                <div className="flex flex-col items-center text-center">
+                  <div className={`mb-4 flex h-20 w-20 items-center justify-center rounded-full border-4 ${
+                    liveMatch.status === "accepted" 
+                      ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-500" 
+                      : "border-red-500/20 bg-red-500/10 text-red-500"
+                  }`}>
+                    {liveMatch.status === "accepted" ? (
+                      <svg className="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
+                    ) : (
+                      <svg className="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    )}
+                  </div>
+                  
+                  <h3 className="text-xl font-bold text-foreground">
+                    {liveMatch.userName}
+                  </h3>
+                  <p className="text-sm text-muted-foreground">{liveMatch.userEmail}</p>
+                  
+                  <div className={`mt-4 inline-flex items-center rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wide ${
+                    liveMatch.status === "accepted"
+                      ? "bg-emerald-500 text-white"
+                      : "bg-red-500 text-white"
+                  }`}>
+                    {liveMatch.statusLabel}
+                  </div>
+
+                  <div className="mt-6 grid w-full grid-cols-2 gap-2 text-xs">
+                    <div className="rounded-lg bg-muted p-2">
+                      <p className="text-muted-foreground">Confidence</p>
+                      <p className="font-mono font-medium">
+                        {liveMatch.distance !== null 
+                          ? `${((1 - liveMatch.distance) * 100).toFixed(1)}%` 
+                          : "N/A"}
+                      </p>
+                    </div>
+                    <div className="rounded-lg bg-muted p-2">
+                      <p className="text-muted-foreground">Time</p>
+                      <p className="font-mono font-medium">
+                        {new Date(liveMatch.capturedAt).toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-8 text-center">
+                  <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                    <svg className="h-8 w-8 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                  </div>
+                  <p className="text-sm font-medium text-foreground">Scanning...</p>
+                  <p className="text-xs text-muted-foreground">Waiting for face detection</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Event Log */}
+          <div className="flex h-[400px] flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+            <div className="border-b border-border bg-muted/50 px-4 py-3">
+              <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Access Log
+              </h2>
+            </div>
+            <div className="flex-1 overflow-y-auto p-0">
+              {events.length > 0 ? (
+                <div className="divide-y divide-border">
+                  {events.map((event) => (
+                    <div key={event.id} className="flex items-start gap-3 p-4 transition hover:bg-muted/50">
+                      <div className={`mt-0.5 h-2 w-2 rounded-full ${
+                        event.status === "accepted" ? "bg-emerald-500" : "bg-red-500"
+                      }`} />
+                      <div className="flex-1 space-y-1">
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm font-medium text-foreground">
+                            {event.userName}
+                          </p>
+                          <span className="text-[10px] text-muted-foreground font-mono">
+                            {new Date(event.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+                        <p className="text-xs text-muted-foreground line-clamp-1">
+                          {event.message}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="flex h-full items-center justify-center p-6 text-center text-xs text-muted-foreground">
+                  No events recorded this session.
+                </div>
+              )}
+            </div>
+          </div>
+        </aside>
       </div>
+
+      {/* Hidden canvas for snapshot capture */}
+      <canvas ref={canvasRef} className="hidden" />
     </main>
   );
 };

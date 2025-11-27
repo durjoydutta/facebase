@@ -8,7 +8,7 @@ import {
 } from "@/lib/recognitionData";
 import type { VisitStatus } from "@/lib/database.types";
 import type { SupabaseAdminClient } from "@/lib/supabaseClient";
-import { AccessControlService } from "@/lib/accessControl";
+
 
 const VISIT_BUCKET = "visit-snapshots";
 
@@ -208,20 +208,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  if (AccessControlService.isConfigured()) {
-    const decisionResult = await AccessControlService.notify({
-      status: payload.status,
-      matchedUserId: payload.matchedUserId ?? null,
-      matchedUserName: matchedUser?.name ?? null,
-      matchedUserEmail: matchedUser?.email ?? null,
-      snapshotUrl: visit.image_url ?? publicUrl,
-      banned: matchedUser?.is_banned ?? false,
-    });
 
-    if (!decisionResult.ok) {
-      console.error("Failed to dispatch access decision", decisionResult);
-    }
-  }
 
   return NextResponse.json({ visit });
 }

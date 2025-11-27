@@ -29,12 +29,26 @@ export interface DashboardData {
   users: DashboardUserRow[];
   faces: DashboardFaceRow[];
   visits: DashboardVisitRow[];
+  stats: {
+    accepted24h: number;
+    rejected24h: number;
+  };
 }
 
 export const fetchDashboardData = async (
   supabase: SupabaseAdminClient
 ): Promise<DashboardData> => {
-  const [usersResult, visitsResult, facesResult] = await Promise.all([
+  const twentyFourHoursAgo = new Date(
+    Date.now() - 24 * 60 * 60 * 1000
+  ).toISOString();
+
+  const [
+    usersResult,
+    visitsResult,
+    facesResult,
+    acceptedResult,
+    rejectedResult,
+  ] = await Promise.all([
     supabase
       .from("users")
       .select("id, name, email, role, is_banned, created_at")
@@ -48,6 +62,16 @@ export const fetchDashboardData = async (
       .from("faces")
       .select("id, user_id, image_url, created_at")
       .order("created_at", { ascending: false }),
+    supabase
+      .from("visits")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "accepted")
+      .gte("timestamp", twentyFourHoursAgo),
+    supabase
+      .from("visits")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "rejected")
+      .gte("timestamp", twentyFourHoursAgo),
   ]);
 
   if (usersResult.error || visitsResult.error || facesResult.error) {
@@ -63,5 +87,9 @@ export const fetchDashboardData = async (
     users: usersResult.data ?? [],
     faces: facesResult.data ?? [],
     visits: visitsResult.data ?? [],
+    stats: {
+      accepted24h: acceptedResult.count ?? 0,
+      rejected24h: rejectedResult.count ?? 0,
+    },
   };
 };
