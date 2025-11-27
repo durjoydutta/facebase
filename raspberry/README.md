@@ -1,56 +1,46 @@
-# FaceBase Raspberry Pi Bridge
+# FaceBase Raspberry Pi Client (MQTT)
 
-This folder contains the optional Raspberry Pi webhook server that receives
-access-control decisions from the FaceBase Next.js backend and toggles GPIO
-pins to unlock/lock a physical actuator.
+This folder contains the Python client for the FaceBase access control system. It uses MQTT to communicate with the Next.js admin console.
 
-## Quick start
+## Features
+- **Motion Detection**: Uses a PIR sensor to detect visitors and publishes `facebase/motion` events.
+- **Access Control**: Subscribes to `facebase/access` to unlock the door (relay) and provide audio feedback (buzzer).
+- **Real-time**: Event-driven architecture for low latency.
 
-```bash
-cd raspberry
-python -m venv .venv
-source .venv/bin/activate  # On Windows use `.venv\Scripts\activate`
-pip install -r requirements.txt
+## Hardware Setup
+- **Relay**: Connected to GPIO 17 (default).
+- **PIR Sensor**: Connected to GPIO 4 (default).
+- **Buzzer**: Connected to GPIO 27 (default).
 
-# Optional: adjust `.env.local` to match your hardware defaults
-python facebase_pi_server.py
-```
+## Quick Start
 
-The server exposes a `POST /webhook` endpoint. Point
-`RASPBERRY_PI_WEBHOOK_URL` in the Next.js app to this URL
-(e.g. `http://pi.local:8080/webhook`).
+1. **Install Dependencies**:
+   ```bash
+   cd raspberry
+   python -m venv .venv
+   source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+   pip install -r requirements.txt
+   ```
 
-## Environment variables
+2. **Configuration**:
+   Create a `.env.local` file in this directory:
+   ```env
+   MQTT_BROKER_URL=broker.hivemq.com
+   MQTT_PORT=8883
+   MQTT_USERNAME=your_username
+   MQTT_PASSWORD=your_password
+   
+   FACEBASE_RELAY_PIN=17
+   FACEBASE_PIR_PIN=4
+   FACEBASE_BUZZER_PIN=27
+   FACEBASE_UNLOCK_SECONDS=3
+   ```
 
-| Variable                    | Description                                                                                                     | Default |
-| --------------------------- | --------------------------------------------------------------------------------------------------------------- | ------- |
-| `FACEBASE_RELAY_PIN`        | BCM pin connected to relay/solenoid controller                                                                  | `17`    |
-| `FACEBASE_UNLOCK_SECONDS`   | Duration to hold the relay active when access is granted                                                        | `3`     |
-| `FACEBASE_SHARED_SECRET`    | Optional bearer token required on incoming requests; must match `RASPBERRY_PI_SHARED_SECRET` in the Next.js app | –       |
-| `FACEBASE_PORT`             | Port the Flask server listens on                                                                                | `8080`  |
-| `FACEBASE_BUZZER_PIN`       | Optional passive buzzer pin used for audible feedback                                                           | –       |
-| `FACEBASE_COOLDOWN_SECONDS` | Minimum delay between successive unlock attempts                                                                | `1`     |
+3. **Run the Client**:
+   ```bash
+   python mqtt_client.py
+   ```
 
-The script automatically loads the `.env.local` file in this directory, so
-editing that file is the simplest way to update relay pins, unlock durations,
-or secrets without exporting environment variables for every run.
-
-## Hardware integration
-
-The script uses `gpiozero.OutputDevice` to drive a relay. When running the
-script on a non-Pi environment, it falls back to logging to stdout so you can
-develop the integration without connected hardware.
-
-If you wire a GPIO buzzer to the pi, set `FACEBASE_BUZZER_PIN` in `.env.local`.
-Accepted events emit three quick beeps; rejected or banned events emit a
-single longer tone so visitors receive immediate feedback. When an accepted
-scan arrives inside the cooldown window, the buzzer plays two medium beeps and
-the server responds with `{"result":"cooldown"}` so the visitor knows to try
-again after the specified interval.
-
-## Event flow overview
-
-- **Accepted (not banned, outside cooldown)**: Relay drops for `FACEBASE_UNLOCK_SECONDS`, buzzer beeps three times, JSON reply `{ "result": "unlocked" }`.
-- **Accepted during cooldown**: Relay stays locked, buzzer plays the cooldown pattern, JSON reply `{ "result": "cooldown", "retry_after": <seconds> }`.
-- **Rejected / face not recognized**: Relay remains locked, buzzer plays a sustained tone, response `{ "result": "denied", "banned": false }`.
-- **Accepted but flagged banned**: Treated as denial; no unlock, rejection tone, response `{ "result": "denied", "banned": true }`.
+## MQTT Topics
+- **Publish**: `facebase/motion` - Payload: `{"event": "motion_detected"}`
+- **Subscribe**: `facebase/access` - Payload: `{"result": "unlocked" | "denied", "banned": boolean}`

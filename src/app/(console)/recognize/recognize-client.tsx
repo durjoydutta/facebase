@@ -6,6 +6,7 @@ import useSWR from "swr";
 
 import type { RecognitionFaceRow } from "@/lib/recognitionData";
 import type { VisitStatus } from "@/lib/database.types";
+import { mqttClient } from "@/lib/mqtt";
 
 const MODEL_URL = "/models";
 const MATCH_THRESHOLD = 0.5;
@@ -200,6 +201,34 @@ const RecognizeClient = ({ adminName, initialFaces }: RecognizeClientProps) => {
     };
   }, []);
 
+  // MQTT Integration
+  useEffect(() => {
+    const brokerUrl = process.env.NEXT_PUBLIC_MQTT_BROKER_URL;
+    const username = process.env.NEXT_PUBLIC_MQTT_USERNAME;
+    const password = process.env.NEXT_PUBLIC_MQTT_PASSWORD;
+
+    if (brokerUrl) {
+      mqttClient.connect({
+        brokerUrl,
+        options: {
+          username,
+          password,
+          protocol: brokerUrl.startsWith("ws") ? "ws" : "wss", // Ensure WebSocket protocol
+        },
+      });
+
+      mqttClient.subscribe("facebase/motion", (message) => {
+        console.log("Motion detected:", message);
+        setStatusMessage("Motion detected! activating recognition...");
+        setIsWatching(true);
+      });
+    }
+
+    return () => {
+      // Optional: disconnect or unsubscribe if needed
+    };
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -372,6 +401,19 @@ const RecognizeClient = ({ adminName, initialFaces }: RecognizeClientProps) => {
     [appendEvent, captureSnapshot]
   );
 
+  // Publish MQTT event when status changes
+  const publishAccessResult = useCallback((status: VisitStatus, isBanned: boolean) => {
+    const topic = "facebase/access";
+    let result = "denied";
+    
+    if (status === "accepted" && !isBanned) {
+      result = "unlocked";
+    }
+
+    console.log(`Publishing MQTT ${topic}:`, { result, banned: isBanned });
+    mqttClient.publish(topic, { result, banned: isBanned });
+  }, []);
+
   const handleManualSync = useCallback(async () => {
     try {
       setIsManualSyncing(true);
@@ -514,6 +556,8 @@ const RecognizeClient = ({ adminName, initialFaces }: RecognizeClientProps) => {
             isRecognized ? matchedFace : null,
             bestMatch?.distance ?? null
           );
+
+          publishAccessResult(matchState.status, matchState.isBanned);
         }
       } catch (error) {
         setStatusMessage(

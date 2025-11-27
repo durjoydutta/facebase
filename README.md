@@ -89,8 +89,11 @@ The App Router groups authenticated console routes under `(console)` and public 
 | `SUPABASE_PROJECT_URL`          | ✔️       | Supabase project URL for server-side admin client (defaults to the public URL if omitted).                          |
 | `SUPABASE_SECRET_KEY`           | ✔️       | Supabase service role key for server-side operations.                                                               |
 | `NEXT_DEPLOYED_URL`             | ➖       | Optional fully-qualified deployment URL used for password reset redirects (falls back to `window.location.origin`). |
-| `RASPBERRY_PI_WEBHOOK_URL`      | ➖       | Optional URL pointing to the Raspberry Pi webhook (e.g., `http://pi.local:8080/webhook`).                           |
-| `RASPBERRY_PI_SHARED_SECRET`    | ➖       | Optional bearer token shared with the Raspberry Pi webhook server.                                                  |
+| `NEXT_PUBLIC_MQTT_BROKER_URL` | ✔️       | MQTT Broker URL (wss://... for browser).                                                                            |
+| `NEXT_PUBLIC_MQTT_USERNAME`   | ➖       | MQTT Username.                                                                                                      |
+| `NEXT_PUBLIC_MQTT_PASSWORD`   | ➖       | MQTT Password.                                                                                                      |
+| `RASPBERRY_PI_WEBHOOK_URL`    | ❌       | (Deprecated) No longer used.                                                                                        |
+| `RASPBERRY_PI_SHARED_SECRET`  | ❌       | (Deprecated) No longer used.                                                                                        |
 
 > **Security note:** Never expose `SUPABASE_SECRET_KEY` to the browser; it is only read in server components and API routes.
 
@@ -158,7 +161,7 @@ These files are already tracked in the repo. If you need to refresh them, downlo
 - **Frontend:** Deploy the Next.js app (e.g., Vercel). Ensure the `NEXT_PUBLIC_SUPABASE_*` variables and `NEXT_DEPLOYED_URL` are configured in the hosting environment.
 - **Backend:** Supabase handles auth, database, storage, and RLS policies. No custom server is required.
 - **Edge caching:** API routes like `/api/dashboard` are marked `force-dynamic` where necessary to ensure up-to-date data.
-- **Future hardware integrations:** `/api/recognize` forwards decisions to `/api/facebase`, which relays them to an optional Raspberry Pi webhook (see `raspberry/` for the companion server). In development the app automatically falls back to `http://localhost:8080/webhook`, so you can run both services on the same machine without extra configuration.
+- **Future hardware integrations:** The system now uses MQTT for real-time communication. The Next.js app publishes access decisions to `facebase/access` and listens for motion on `facebase/motion`. See `raspberry/README.md` for the Pi client setup.
 
 ---
 
