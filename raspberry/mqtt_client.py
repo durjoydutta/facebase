@@ -7,7 +7,7 @@ from gpiozero import OutputDevice, MotionSensor, Buzzer
 from dotenv import load_dotenv
 
 # Load environment variables
-load_dotenv('.env.local')
+load_dotenv('../.env.local')
 
 # Configuration
 MQTT_BROKER = os.getenv('MQTT_BROKER_URL', 'broker.hivemq.com')
@@ -37,7 +37,7 @@ except Exception as e:
 last_motion_time = 0
 MOTION_COOLDOWN = 5  # Seconds between motion events
 
-def on_connect(client, userdata, flags, rc):
+def on_connect(client, userdata, flags, rc, properties=None):
     print(f"Connected with result code {rc}")
     client.subscribe(MQTT_TOPIC_ACCESS)
 
@@ -104,7 +104,7 @@ def motion_loop(client):
         time.sleep(0.1)
 
 def main():
-    client = mqtt.Client()
+    client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
     
     if MQTT_USERNAME and MQTT_PASSWORD:
         client.username_pw_set(MQTT_USERNAME, MQTT_PASSWORD)

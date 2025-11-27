@@ -1,3 +1,4 @@
 gpiozero
 paho-mqtt
 python-dotenv
+lgpio
