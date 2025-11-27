@@ -185,8 +185,67 @@ const UserDetailClient = ({
     }
   };
 
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isDeleting, setIsDeleting] = useState<string | null>(null);
+
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedIds(new Set(visits.map((v) => v.id)));
+    } else {
+      setSelectedIds(new Set());
+    }
+  };
+
+  const handleSelectOne = (id: string, checked: boolean) => {
+    const next = new Set(selectedIds);
+    if (checked) {
+      next.add(id);
+    } else {
+      next.delete(id);
+    }
+    setSelectedIds(next);
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return;
+    if (
+      !confirm(
+        `Are you sure you want to delete ${selectedIds.size} selected records?`
+      )
+    )
+      return;
+
+    setIsDeleting("bulk");
+    try {
+      const res = await fetch("/api/visits", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: Array.from(selectedIds) }),
+      });
+
+      if (!res.ok) throw new Error("Failed to delete records");
+      
+      setSelectedIds(new Set());
+      // Re-fetch visits
+      const updatedVisits = await fetcher(`/api/users/${user.id}/visits?page=${page}&limit=${limit}`);
+      // Since we use SWR, we can just trigger a revalidation, but here we might need to manually mutate if we don't have the mutate function exposed easily or just rely on auto-revalidation.
+      // Ideally we should use mutate from useSWR.
+      // Let's just refresh the page for simplicity as per previous patterns, or better, use router.refresh()
+      router.refresh();
+      // Also mutate SWR cache if possible, but we need the key.
+      // We can just reload the window or let SWR handle it on focus.
+      // For now, router.refresh() is good.
+    } catch (err) {
+      console.error(err);
+      alert("Failed to delete records");
+    } finally {
+      setIsDeleting(null);
+    }
+  };
+
   return (
     <main className="space-y-8 pb-10">
+      {/* ... (existing modals) ... */}
       <ImageModal
         isOpen={!!selectedImage}
         onClose={() => setSelectedImage(null)}
@@ -363,6 +422,17 @@ const UserDetailClient = ({
                 <table className="min-w-full divide-y divide-border text-left text-sm">
                   <thead className="bg-muted/40 text-muted-foreground">
                     <tr>
+                      <th className="w-12 px-4 py-3">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                          checked={
+                            visits.length > 0 &&
+                            visits.every((v) => selectedIds.has(v.id))
+                          }
+                          onChange={(e) => handleSelectAll(e.target.checked)}
+                        />
+                      </th>
                       <th className="px-4 py-3 font-medium">Snapshot</th>
                       <th className="px-4 py-3 font-medium">Status</th>
                       <th className="px-4 py-3 font-medium">Time</th>
@@ -371,7 +441,17 @@ const UserDetailClient = ({
                   <tbody className="divide-y divide-border">
                     {visits.length ? (
                       visits.map((visit) => (
-                        <tr key={visit.id}>
+                        <tr key={visit.id} className="group hover:bg-muted/30">
+                          <td className="px-4 py-3">
+                            <input
+                              type="checkbox"
+                              className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                              checked={selectedIds.has(visit.id)}
+                              onChange={(e) =>
+                                handleSelectOne(visit.id, e.target.checked)
+                              }
+                            />
+                          </td>
                           <td className="px-4 py-3">
                             {visit.image_url ? (
                               <div className="relative h-10 w-10 overflow-hidden rounded-lg border border-border">
@@ -409,7 +489,7 @@ const UserDetailClient = ({
                     ) : (
                       <tr>
                         <td
-                          colSpan={3}
+                          colSpan={4}
                           className="px-4 py-8 text-center text-muted-foreground">
                           {isLoadingVisits
                             ? "Loading visits..."
@@ -469,6 +549,43 @@ const UserDetailClient = ({
               </div>
             </dl>
           </div>
+        </div>
+      </div>
+
+      {/* Sticky Action Bar */}
+      <div
+        className={`fixed bottom-6 left-1/2 z-50 flex w-full max-w-2xl -translate-x-1/2 items-center justify-between rounded-full border border-border bg-background/80 px-6 py-3 shadow-xl backdrop-blur-md transition-all duration-300 ${
+          selectedIds.size > 0
+            ? "translate-y-0 opacity-100"
+            : "translate-y-20 opacity-0 pointer-events-none"
+        }`}>
+        <div className="flex items-center gap-4">
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary">
+            <span className="text-sm font-bold">{selectedIds.size}</span>
+          </div>
+          <span className="text-sm font-medium text-muted-foreground">
+            items selected
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setSelectedIds(new Set())}
+            className="rounded-full px-4 py-2 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground">
+            Cancel
+          </button>
+          <button
+            onClick={handleBulkDelete}
+            disabled={!!isDeleting}
+            className="inline-flex items-center gap-2 rounded-full bg-destructive px-5 py-2 text-sm font-medium text-destructive-foreground transition hover:bg-destructive/90 disabled:opacity-50">
+            {isDeleting === "bulk" ? (
+              "Deleting..."
+            ) : (
+              <>
+                <Trash2 className="h-4 w-4" />
+                Delete
+              </>
+            )}
+          </button>
         </div>
       </div>
     </main>

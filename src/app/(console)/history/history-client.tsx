@@ -188,15 +188,6 @@ const HistoryClient = ({ initialVisits, initialTotal }: HistoryClientProps) => {
             Review and manage access logs.
           </p>
         </div>
-        {selectedIds.size > 0 && (
-          <button
-            onClick={handleBulkDelete}
-            disabled={!!isDeleting}
-            className="inline-flex items-center gap-2 rounded-lg bg-destructive px-4 py-2 text-sm font-medium text-destructive-foreground transition hover:bg-destructive/90 disabled:opacity-50">
-            <Trash2 className="h-4 w-4" />
-            Delete Selected ({selectedIds.size})
-          </button>
-        )}
       </header>
 
       <section className="rounded-2xl border border-border bg-card p-6 shadow-sm">
@@ -381,6 +372,43 @@ const HistoryClient = ({ initialVisits, initialTotal }: HistoryClientProps) => {
           </div>
         </div>
       </section>
+
+      {/* Sticky Action Bar */}
+      <div
+        className={`fixed bottom-6 left-1/2 z-50 flex w-full max-w-2xl -translate-x-1/2 items-center justify-between rounded-full border border-border bg-background/80 px-6 py-3 shadow-xl backdrop-blur-md transition-all duration-300 ${
+          selectedIds.size > 0
+            ? "translate-y-0 opacity-100"
+            : "translate-y-20 opacity-0 pointer-events-none"
+        }`}>
+        <div className="flex items-center gap-4">
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary">
+            <span className="text-sm font-bold">{selectedIds.size}</span>
+          </div>
+          <span className="text-sm font-medium text-muted-foreground">
+            items selected
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setSelectedIds(new Set())}
+            className="rounded-full px-4 py-2 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground">
+            Cancel
+          </button>
+          <button
+            onClick={handleBulkDelete}
+            disabled={!!isDeleting}
+            className="inline-flex items-center gap-2 rounded-full bg-destructive px-5 py-2 text-sm font-medium text-destructive-foreground transition hover:bg-destructive/90 disabled:opacity-50">
+            {isDeleting === "bulk" ? (
+              "Deleting..."
+            ) : (
+              <>
+                <Trash2 className="h-4 w-4" />
+                Delete
+              </>
+            )}
+          </button>
+        </div>
+      </div>
     </main>
   );
 };

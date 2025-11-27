@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import useSWR from "swr";
-import { ChevronRight, MoreHorizontal, User } from "lucide-react";
+import { ChevronRight, MoreHorizontal, Search, User } from "lucide-react";
 
 import type {
   DashboardData,
@@ -102,6 +102,22 @@ const DashboardClient = ({ adminName, initialData }: DashboardClientProps) => {
       lastSeen: lastVisits.get(user.id) ?? null,
     }));
   }, [dashboard]);
+
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const { admins, members } = useMemo(() => {
+    const query = searchQuery.toLowerCase().trim();
+    const filtered = usersWithStats.filter(
+      (u) =>
+        u.name?.toLowerCase().includes(query) ||
+        u.email.toLowerCase().includes(query)
+    );
+
+    return {
+      admins: filtered.filter((u) => u.role === "admin"),
+      members: filtered.filter((u) => u.role !== "admin"),
+    };
+  }, [usersWithStats, searchQuery]);
 
   const handleManualSync = useCallback(async () => {
     try {
@@ -251,101 +267,65 @@ const DashboardClient = ({ adminName, initialData }: DashboardClientProps) => {
           </div>
         </section>
 
-        <section className="space-y-6">
-          <header className="flex items-center justify-between border-b border-border pb-4">
+        <section className="space-y-8">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-border pb-4">
             <div>
               <h2 className="text-lg font-semibold">Users</h2>
               <p className="text-sm text-muted-foreground">
                 Manage access and view individual history.
               </p>
             </div>
-          </header>
-          
-          {usersWithStats.length ? (
-            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-              {usersWithStats.map((user) => (
-                <Link
-                  key={user.id}
-                  href={`/users/${user.id}`}
-                  className="group relative flex flex-col overflow-hidden rounded-2xl border border-border bg-card transition hover:border-primary/50 hover:shadow-md">
-                  <div className="flex flex-1 flex-col p-6">
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
-                          <User className="h-6 w-6" />
-                        </div>
-                        <div>
-                          <div className="font-semibold text-foreground">
-                            {user.name ?? "Unnamed"}
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            {user.email}
-                          </div>
-                        </div>
-                      </div>
-                      {user.is_banned ? (
-                        <span className="inline-flex items-center rounded-full bg-destructive/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-destructive">
-                          Banned
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-600">
-                          Active
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="mt-6 flex items-center justify-between text-xs text-muted-foreground">
-                      <div className="flex items-center gap-1.5">
-                        <span className="font-medium text-foreground">
-                          {user.role}
-                        </span>
-                      </div>
-                      <div>
-                        Last seen:{" "}
-                        <span className="font-medium text-foreground">
-                          {user.lastSeen ? formatDate(user.lastSeen) : "Never"}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Face Thumbnails */}
-                    <div className="mt-6 flex items-center gap-2">
-                      {user.recentFaces.length > 0 ? (
-                        user.recentFaces.map((faceUrl, idx) => (
-                          <div
-                            key={idx}
-                            className="relative h-10 w-10 overflow-hidden rounded-lg border border-border bg-muted">
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
-                              src={faceUrl}
-                              alt="Face sample"
-                              className="h-full w-full object-cover"
-                            />
-                          </div>
-                        ))
-                      ) : (
-                        <span className="text-xs text-muted-foreground">
-                          No face samples
-                        </span>
-                      )}
-                      {user.faceCount > 3 && (
-                        <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-muted text-xs font-medium text-muted-foreground">
-                          +{user.faceCount - 3}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center justify-between border-t border-border bg-muted/30 px-6 py-3 text-xs font-medium text-muted-foreground group-hover:bg-primary/5 group-hover:text-primary">
-                    <span>View Details</span>
-                    <ChevronRight className="h-4 w-4" />
-                  </div>
-                </Link>
-              ))}
+            <div className="relative w-full sm:w-72">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <input
+                type="text"
+                placeholder="Search users..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full rounded-lg border border-input bg-background pl-9 pr-4 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              />
             </div>
-          ) : (
+          </div>
+
+          {/* Admins Section */}
+          <div className="space-y-4">
+            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+              Administrators ({admins.length})
+            </h3>
+            {admins.length ? (
+              <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                {admins.map((user) => (
+                  <UserCard key={user.id} user={user} />
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground italic">
+                No administrators found.
+              </p>
+            )}
+          </div>
+
+          {/* Members Section */}
+          <div className="space-y-4">
+            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+              Members ({members.length})
+            </h3>
+            {members.length ? (
+              <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                {members.map((user) => (
+                  <UserCard key={user.id} user={user} />
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground italic">
+                No members found.
+              </p>
+            )}
+          </div>
+
+          {!admins.length && !members.length && (
             <div className="rounded-xl border border-dashed border-border p-12 text-center text-muted-foreground">
-              No users found.
+              No users found matching "{searchQuery}".
             </div>
           )}
         </section>
@@ -355,3 +335,76 @@ const DashboardClient = ({ adminName, initialData }: DashboardClientProps) => {
 };
 
 export default DashboardClient;
+
+const UserCard = ({ user }: { user: any }) => (
+  <Link
+    href={`/users/${user.id}`}
+    className="group relative flex flex-col overflow-hidden rounded-2xl border border-border bg-card transition hover:border-primary/50 hover:shadow-md">
+    <div className="flex flex-1 flex-col p-6">
+      <div className="flex items-start justify-between">
+        <div className="flex items-center gap-3">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
+            <User className="h-6 w-6" />
+          </div>
+          <div>
+            <div className="font-semibold text-foreground">
+              {user.name ?? "Unnamed"}
+            </div>
+            <div className="text-xs text-muted-foreground">{user.email}</div>
+          </div>
+        </div>
+        {user.is_banned ? (
+          <span className="inline-flex items-center rounded-full bg-destructive/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-destructive">
+            Banned
+          </span>
+        ) : (
+          <span className="inline-flex items-center rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-600">
+            Active
+          </span>
+        )}
+      </div>
+
+      <div className="mt-6 flex items-center justify-between text-xs text-muted-foreground">
+        <div className="flex items-center gap-1.5">
+          <span className="font-medium text-foreground">{user.role}</span>
+        </div>
+        <div>
+          Last seen:{" "}
+          <span className="font-medium text-foreground">
+            {user.lastSeen ? formatDate(user.lastSeen) : "Never"}
+          </span>
+        </div>
+      </div>
+
+      {/* Face Thumbnails */}
+      <div className="mt-6 flex items-center gap-2">
+        {user.recentFaces.length > 0 ? (
+          user.recentFaces.map((faceUrl: string, idx: number) => (
+            <div
+              key={idx}
+              className="relative h-10 w-10 overflow-hidden rounded-lg border border-border bg-muted">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={faceUrl}
+                alt="Face sample"
+                className="h-full w-full object-cover"
+              />
+            </div>
+          ))
+        ) : (
+          <span className="text-xs text-muted-foreground">No face samples</span>
+        )}
+        {user.faceCount > 3 && (
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-muted text-xs font-medium text-muted-foreground">
+            +{user.faceCount - 3}
+          </div>
+        )}
+      </div>
+    </div>
+
+    <div className="flex items-center justify-between border-t border-border bg-muted/30 px-6 py-3 text-xs font-medium text-muted-foreground group-hover:bg-primary/5 group-hover:text-primary">
+      <span>View Details</span>
+      <ChevronRight className="h-4 w-4" />
+    </div>
+  </Link>
+);
