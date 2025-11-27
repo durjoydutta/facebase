@@ -15,17 +15,12 @@ import {
 } from "lucide-react";
 
 import { ImageModal } from "@/components/ImageModal";
-import type { VisitStatus } from "@/lib/database.types";
+import type { Database, VisitStatus } from "@/lib/database.types";
+
+type UserRow = Database["public"]["Tables"]["users"]["Row"];
 
 interface UserDetailClientProps {
-  user: {
-    id: string;
-    name: string | null;
-    email: string;
-    role: "admin" | "member";
-    is_banned: boolean;
-    created_at: string;
-  };
+  user: UserRow;
   initialFaces: {
     id: string;
     image_url: string;

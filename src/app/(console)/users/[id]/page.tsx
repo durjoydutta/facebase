@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation";
+import { PostgrestSingleResponse } from "@supabase/supabase-js";
 
 import { requireAdmin } from "@/lib/auth";
+import { Database } from "@/lib/database.types";
 import { getSupabaseAdminClient } from "@/lib/supabaseClient";
 
 import UserDetailClient from "./user-detail-client";
@@ -13,14 +15,28 @@ interface UserPageProps {
   }>;
 }
 
+type UserRow = Database["public"]["Tables"]["users"]["Row"];
+
 const UserPage = async ({ params }: UserPageProps) => {
   await requireAdmin();
   const { id } = await params;
   const supabase = getSupabaseAdminClient();
 
-  // Fetch user details, faces, and recent visits in parallel
-  const [userResult, facesResult, visitsResult] = await Promise.all([
-    supabase.from("users").select("*").eq("id", id).single(),
+  // Fetch user details first to handle 404 early and ensure type inference
+  const userResult = (await supabase
+    .from("users")
+    .select("*")
+    .eq("id", id)
+    .single()) as PostgrestSingleResponse<UserRow>;
+
+  if (userResult.error || !userResult.data) {
+    notFound();
+  }
+
+  const user: UserRow = userResult.data;
+
+  // Fetch faces and visits in parallel
+  const [facesResult, visitsResult] = await Promise.all([
     supabase
       .from("faces")
       .select("id, image_url, created_at")
@@ -34,11 +50,6 @@ const UserPage = async ({ params }: UserPageProps) => {
       .limit(50), // Initial limit, client can paginate if needed
   ]);
 
-  if (userResult.error || !userResult.data) {
-    notFound();
-  }
-
-  const user = userResult.data;
   const faces = facesResult.data ?? [];
   const visits = visitsResult.data ?? [];
 

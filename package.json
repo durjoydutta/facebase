@@ -1,12 +1,12 @@
 {
   "name": "facebase",
-  "version": "0.4.0",
+  "version": "1.0.0",
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build --turbopack",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "next lint"
   },
   "dependencies": {
     "@supabase/ssr": "^0.7.0",
