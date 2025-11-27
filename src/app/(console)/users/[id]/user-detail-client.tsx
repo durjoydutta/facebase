@@ -14,8 +14,8 @@ import {
   User,
 } from "lucide-react";
 
-import type { VisitStatus } from "@/lib/database.types";
 import { ImageModal } from "@/components/ImageModal";
+import type { VisitStatus } from "@/lib/database.types";
 
 interface UserDetailClientProps {
   user: {
