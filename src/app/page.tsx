@@ -62,7 +62,7 @@ const HomePage = async () => {
           </p>
           <div className="flex flex-col gap-4 sm:flex-row">
             <Link
-              href="/login"
+              href={profile ? "/dashboard" : "/login"}
               className="rounded-full bg-primary px-7 py-3 text-base font-medium text-primary-foreground transition hover:bg-primary/90">
               Admin Dashboard
             </Link>
