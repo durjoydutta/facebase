@@ -95,12 +95,30 @@ const DashboardClient = ({ adminName, initialData }: DashboardClientProps) => {
       }
     }
 
-    return users.map((user) => ({
-      ...user,
-      faceCount: faceCounts.get(user.id) ?? 0,
-      recentFaces: facesByUser.get(user.id) ?? [],
-      lastSeen: lastVisits.get(user.id) ?? null,
-    }));
+    return users.map((user) => {
+      // Use the explicitly fetched last_visit if available, otherwise fall back to the recent visits list
+      const fetchedLastSeen = user.last_visit?.[0]?.timestamp;
+      const listLastSeen = lastVisits.get(user.id);
+      
+      // Prefer the fetched one as it's more accurate (not limited to top 25)
+      // But if we have a newer one in the live list (e.g. from real-time update), use that?
+      // Actually, since we just fetched everything, the fetched one is accurate.
+      // However, if we receive real-time updates, `dashboard.visits` might update.
+      // Let's take the max of both if both exist, or whichever exists.
+      
+      let lastSeen = fetchedLastSeen ?? listLastSeen ?? null;
+      
+      if (fetchedLastSeen && listLastSeen) {
+         lastSeen = new Date(fetchedLastSeen) > new Date(listLastSeen) ? fetchedLastSeen : listLastSeen;
+      }
+
+      return {
+        ...user,
+        faceCount: faceCounts.get(user.id) ?? 0,
+        recentFaces: facesByUser.get(user.id) ?? [],
+        lastSeen,
+      };
+    });
   }, [dashboard]);
 
   const [searchQuery, setSearchQuery] = useState("");

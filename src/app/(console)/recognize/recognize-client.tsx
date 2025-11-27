@@ -425,7 +425,7 @@ const RecognizeClient = ({ adminName, initialFaces }: RecognizeClientProps) => {
         </div>
       </header>
 
-      <div className="mx-auto grid w-full max-w-6xl gap-6 px-6 sm:px-10 lg:grid-cols-[1fr_350px]">
+      <div className="mx-auto grid w-full max-w-6xl gap-6 px-6 sm:px-10 lg:grid-cols-[1fr_350px] lg:h-[calc(100vh-12rem)] lg:min-h-[600px]">
         {/* Main Video Feed */}
         <section className="relative overflow-hidden rounded-3xl border border-border bg-black shadow-2xl h-full">
           <div className="relative h-full w-full overflow-hidden">
@@ -486,8 +486,8 @@ const RecognizeClient = ({ adminName, initialFaces }: RecognizeClientProps) => {
         </section>
 
         {/* Sidebar */}
-        <aside className="flex flex-col gap-6 h-full">
-          <div className="flex-none overflow-hidden rounded-2xl border border-border bg-card shadow-sm h-[380px]">
+        <aside className="flex flex-col gap-6 h-full min-h-0">
+          <div className="flex-none overflow-hidden rounded-2xl border border-border bg-card shadow-sm h-[360px] lg:h-auto lg:min-h-[320px] lg:flex-[0_0_auto]">
             <div className="border-b border-border bg-muted/50 px-4 py-3">
               <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 Identification Status
@@ -554,7 +554,7 @@ const RecognizeClient = ({ adminName, initialFaces }: RecognizeClientProps) => {
             </div>
           </div>
 
-          <div className="flex h-[400px] flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+          <div className="flex h-[400px] lg:h-auto flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm flex-1 min-h-0">
             <div className="border-b border-border bg-muted/50 px-4 py-3">
               <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 Access Log

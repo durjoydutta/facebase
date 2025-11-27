@@ -7,6 +7,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { Database } from "@/lib/database.types";
 import { getSupabaseBrowserClient } from "@/lib/supabaseBrowserClient";
+import { resolveEmailFromUserId, resolveEmailFromUsername } from "./actions";
 
 let supabaseInitError: Error | null = null;
 let supabaseClient: SupabaseClient<Database> | null = null;
@@ -21,7 +22,7 @@ const LoginPage = () => {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
-  const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [resetEmail, setResetEmail] = useState("");
   const [showResetForm, setShowResetForm] = useState(false);
@@ -101,15 +102,35 @@ SUPABASE_SECRET_KEY=your-service-role-key`}
     setStatus(null);
 
     startSignInTransition(async () => {
-      const trimmedEmail = email.trim();
+      const trimmedIdentifier = identifier.trim();
 
-      if (!trimmedEmail || !password) {
-        setError("Email and password are required.");
+      if (!trimmedIdentifier || !password) {
+        setError("Email/User ID and password are required.");
         return;
       }
 
+      let finalEmail = trimmedIdentifier;
+      const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedIdentifier);
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(trimmedIdentifier);
+
+      if (!isEmail) {
+        let resolvedEmail: string | null = null;
+
+        if (isUuid) {
+          resolvedEmail = await resolveEmailFromUserId(trimmedIdentifier);
+        } else {
+          resolvedEmail = await resolveEmailFromUsername(trimmedIdentifier);
+        }
+
+        if (!resolvedEmail) {
+          setError("Invalid User ID, Username, or Email.");
+          return;
+        }
+        finalEmail = resolvedEmail;
+      }
+
       const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: trimmedEmail,
+        email: finalEmail,
         password,
       });
 
@@ -129,7 +150,7 @@ SUPABASE_SECRET_KEY=your-service-role-key`}
     setStatus(null);
 
     startResetTransition(async () => {
-      const targetEmail = (resetEmail || email).trim();
+      const targetEmail = (resetEmail || identifier).trim();
 
       if (!targetEmail) {
         setError("Enter the admin email to send a reset link.");
@@ -171,7 +192,9 @@ SUPABASE_SECRET_KEY=your-service-role-key`}
         return false;
       }
 
-      setResetEmail((value) => value || email.trim());
+      // Only pre-fill if it looks like an email
+      const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(identifier.trim());
+      setResetEmail((value) => value || (isEmail ? identifier.trim() : ""));
       return true;
     });
   };
@@ -187,18 +210,18 @@ SUPABASE_SECRET_KEY=your-service-role-key`}
         </div>
         <form className="mt-8 space-y-4" onSubmit={handleSubmit} noValidate>
           <div className="space-y-2 text-left">
-            <label className="text-sm font-medium" htmlFor="email">
-              Email
+            <label className="text-sm font-medium" htmlFor="identifier">
+              Username or Email
             </label>
             <input
-              id="email"
-              name="email"
-              type="email"
+              id="identifier"
+              name="identifier"
+              type="text"
               required
-              autoComplete="email"
-              placeholder="admin@example.com"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
+              autoComplete="username"
+              placeholder="ddc or ddc@team7.com"
+              value={identifier}
+              onChange={(event) => setIdentifier(event.target.value)}
               className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             />
           </div>

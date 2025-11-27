@@ -8,6 +8,7 @@ export interface DashboardUserRow {
   role: "admin" | "member";
   is_banned: boolean;
   created_at: string;
+  last_visit?: { timestamp: string }[];
 }
 
 export interface DashboardFaceRow {
@@ -51,8 +52,10 @@ export const fetchDashboardData = async (
   ] = await Promise.all([
     supabase
       .from("users")
-      .select("id, name, email, role, is_banned, created_at")
-      .order("created_at", { ascending: false }),
+      .select("id, name, email, role, is_banned, created_at, last_visit:visits(timestamp)")
+      .order("created_at", { ascending: false })
+      .order("timestamp", { referencedTable: "visits", ascending: false })
+      .limit(1, { foreignTable: "visits" }),
     supabase
       .from("visits")
       .select("id, timestamp, status, matched_user_id, image_url")
@@ -83,8 +86,15 @@ export const fetchDashboardData = async (
     );
   }
 
+  // Transform usersResult.data to match DashboardUserRow structure if needed
+  // The query returns last_visit as an array of objects due to the one-to-many relationship
+  const users = (usersResult.data ?? []).map((user: any) => ({
+    ...user,
+    last_visit: user.last_visit,
+  }));
+
   return {
-    users: usersResult.data ?? [],
+    users: users as DashboardUserRow[],
     faces: facesResult.data ?? [],
     visits: visitsResult.data ?? [],
     stats: {

@@ -1,11 +1,12 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import useSWR from "swr";
 import {
   ArrowLeft,
+  Calendar as CalendarIcon,
   ChevronLeft,
   ChevronRight,
   Shield,
@@ -16,6 +17,136 @@ import {
 
 import { ImageModal } from "@/components/ImageModal";
 import type { Database, VisitStatus } from "@/lib/database.types";
+
+// --- Attendance Calendar Component ---
+
+const AttendanceCalendar = ({ userId }: { userId: string }) => {
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const year = currentDate.getFullYear();
+  const month = currentDate.getMonth() + 1;
+
+  const { data, isLoading } = useSWR<{ timestamps: string[] }>(
+    `/api/users/${userId}/attendance?year=${year}&month=${month}`,
+    fetcher
+  );
+
+  const visitedDays = useMemo(() => {
+    const days = new Set<number>();
+    if (data?.timestamps) {
+      data.timestamps.forEach((ts) => {
+        const date = new Date(ts);
+        days.add(date.getDate());
+      });
+    }
+    return days;
+  }, [data]);
+
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const firstDayOfMonth = new Date(year, month - 1, 1).getDay(); // 0 = Sunday
+
+  const prevMonth = () => {
+    setCurrentDate(new Date(year, month - 2, 1));
+  };
+
+  const nextMonth = () => {
+    setCurrentDate(new Date(year, month, 1));
+  };
+
+  const monthName = currentDate.toLocaleString("default", { month: "long" });
+
+  const renderCalendarDays = () => {
+    const days = [];
+    // Empty cells for days before the first day of the month
+    for (let i = 0; i < firstDayOfMonth; i++) {
+      days.push(<div key={`empty-${i}`} className="h-10 w-10" />);
+    }
+
+    // Days of the month
+    for (let d = 1; d <= daysInMonth; d++) {
+      const isVisited = visitedDays.has(d);
+      const isToday =
+        d === new Date().getDate() &&
+        month === new Date().getMonth() + 1 &&
+        year === new Date().getFullYear();
+
+      days.push(
+        <div
+          key={d}
+          className={`flex h-10 w-10 items-center justify-center rounded-full text-sm font-medium transition-colors ${
+            isVisited
+              ? "bg-emerald-500 text-white shadow-sm"
+              : isToday
+              ? "border border-primary text-primary"
+              : "text-foreground hover:bg-muted"
+          }`}
+          title={isVisited ? "Visited" : undefined}
+        >
+          {d}
+        </div>
+      );
+    }
+    return days;
+  };
+
+  return (
+    <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
+      <div className="mb-6 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <CalendarIcon className="h-5 w-5 text-muted-foreground" />
+          <h3 className="font-semibold">Attendance</h3>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={prevMonth}
+            className="rounded-lg border border-border p-1 hover:bg-muted"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+          <span className="min-w-[100px] text-center text-sm font-medium">
+            {monthName} {year}
+          </span>
+          <button
+            onClick={nextMonth}
+            className="rounded-lg border border-border p-1 hover:bg-muted"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-7 gap-1 text-center">
+        {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((day) => (
+          <div
+            key={day}
+            className="flex h-10 w-10 items-center justify-center text-xs font-medium text-muted-foreground"
+          >
+            {day}
+          </div>
+        ))}
+        {renderCalendarDays()}
+      </div>
+      
+      {isLoading && (
+        <div className="mt-4 text-center text-xs text-muted-foreground">
+          Loading attendance data...
+        </div>
+      )}
+      
+      <div className="mt-6 flex items-center gap-4 text-xs text-muted-foreground">
+        <div className="flex items-center gap-1.5">
+          <div className="h-3 w-3 rounded-full bg-emerald-500" />
+          <span>Present</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div className="h-3 w-3 rounded-full border border-primary" />
+          <span>Today</span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+
 
 type UserRow = Database["public"]["Tables"]["users"]["Row"];
 
@@ -544,6 +675,8 @@ const UserDetailClient = ({
               </div>
             </dl>
           </div>
+          
+          <AttendanceCalendar userId={user.id} />
         </div>
       </div>
 
