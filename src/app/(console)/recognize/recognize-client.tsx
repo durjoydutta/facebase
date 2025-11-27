@@ -213,7 +213,7 @@ const RecognizeClient = ({ adminName, initialFaces }: RecognizeClientProps) => {
         options: {
           username,
           password,
-          protocol: brokerUrl.startsWith("ws") ? "ws" : "wss", // Ensure WebSocket protocol
+          protocol: brokerUrl.startsWith("wss") ? "wss" : "ws", // Ensure WebSocket protocol
         },
       });
 
