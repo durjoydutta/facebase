@@ -327,7 +327,7 @@ export const useFaceRecognitionEngine = ({
       isActive = false;
       cancelAnimationFrame(animationFrameId);
     };
-  }, [isScanning, modelsLoaded, knownFaces, onAccessDecision]);
+  }, [isScanning, modelsLoaded, knownFaces, onAccessDecision, videoRef]);
 
   // Handle scanning state changes
   useEffect(() => {

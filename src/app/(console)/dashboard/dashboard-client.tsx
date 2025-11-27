@@ -325,7 +325,7 @@ const DashboardClient = ({ adminName, initialData }: DashboardClientProps) => {
 
           {!admins.length && !members.length && (
             <div className="rounded-xl border border-dashed border-border p-12 text-center text-muted-foreground">
-              No users found matching "{searchQuery}".
+              No users found matching &quot;{searchQuery}&quot;.
             </div>
           )}
         </section>
