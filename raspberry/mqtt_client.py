@@ -3,7 +3,8 @@ import time
 import json
 import threading
 import paho.mqtt.client as mqtt
-from gpiozero import OutputDevice, MotionSensor, Buzzer
+import pigpio
+from gpiozero import MotionSensor, Buzzer
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -18,13 +19,21 @@ MQTT_TOPIC_MOTION = os.getenv('MQTT_TOPIC_MOTION', 'facebase/motion')
 MQTT_TOPIC_ACCESS = os.getenv('MQTT_TOPIC_ACCESS', 'facebase/access')
 
 # Hardware Pin Configuration
-PIN_RELAY = int(os.getenv('FACEBASE_RELAY_PIN', 17))
+PIN_SERVO = int(os.getenv('FACEBASE_SERVO_PIN', 17))
 PIN_PIR = int(os.getenv('FACEBASE_PIR_PIN', 4))
 PIN_BUZZER = int(os.getenv('FACEBASE_BUZZER_PIN', 27))
 UNLOCK_DURATION = int(os.getenv('FACEBASE_UNLOCK_SECONDS', 3))
 
+# Servo Configuration
+SERVO_LOCKED_ANGLE = 12
+SERVO_UNLOCKED_ANGLE = 97
+
 # Initialize Hardware
-relay = OutputDevice(PIN_RELAY, active_high=False, initial_value=False)
+pi = pigpio.pi()
+if not pi.connected:
+    print("Error: Could not connect to pigpio daemon. Is it running? (sudo pigpiod)")
+    exit(1)
+
 pir = MotionSensor(PIN_PIR)
 buzzer = None
 
@@ -36,6 +45,35 @@ except Exception as e:
 # Global state
 last_motion_time = 0
 MOTION_COOLDOWN = 5  # Seconds between motion events
+
+# --- Servo Helper Functions ---
+
+def set_angle(angle):
+    """
+    Sets the servo to a specific angle (0-180).
+    Maps angle to pulse width (500-2500us).
+    """
+    if angle < 0: angle = 0
+    if angle > 180: angle = 180
+    
+    pulse_width = 500 + (angle / 180.0) * 2000
+    pi.set_servo_pulsewidth(PIN_SERVO, pulse_width)
+
+def lock():
+    """Moves servo to the locked position."""
+    print(f"Locking door (Angle: {SERVO_LOCKED_ANGLE})...")
+    set_angle(SERVO_LOCKED_ANGLE)
+    # Allow time for movement
+    time.sleep(0.5)
+    # Optional: Turn off servo signal to prevent jitter/humming if holding torque isn't needed
+    # pi.set_servo_pulsewidth(PIN_SERVO, 0)
+
+def unlock():
+    """Moves servo to the unlocked position."""
+    print(f"Unlocking door (Angle: {SERVO_UNLOCKED_ANGLE})...")
+    set_angle(SERVO_UNLOCKED_ANGLE)
+
+# --- MQTT Handlers ---
 
 def on_connect(client, userdata, flags, rc, properties=None):
     print(f"Connected with result code {rc}")
@@ -59,7 +97,9 @@ def on_message(client, userdata, msg):
         print("Failed to decode JSON payload")
 
 def handle_unlock():
-    print("Access GRANTED. Unlocking...")
+    print("Access GRANTED. Initiating unlock sequence...")
+    
+    # Visual/Audio Feedback
     if buzzer:
         # 3 short beeps
         for _ in range(3):
@@ -68,10 +108,15 @@ def handle_unlock():
             buzzer.off()
             time.sleep(0.1)
             
-    relay.on()
+    # Unlock Action
+    unlock()
+    
+    # Wait
     time.sleep(UNLOCK_DURATION)
-    relay.off()
-    print("Locked.")
+    
+    # Lock Action
+    lock()
+    print("Door re-locked.")
 
 def handle_denied():
     print("Access DENIED.")
@@ -104,12 +149,14 @@ def motion_loop(client):
         time.sleep(0.1)
 
 def main():
+    # Set initial state to locked
+    lock()
+
     client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
     
     if MQTT_USERNAME and MQTT_PASSWORD:
         client.username_pw_set(MQTT_USERNAME, MQTT_PASSWORD)
         
-    # Enable TLS if using port 8883 (standard for secure MQTT)
     if MQTT_PORT == 8883:
         client.tls_set()
 
@@ -123,15 +170,15 @@ def main():
         print(f"Failed to connect to MQTT broker: {e}")
         return
 
-    # Start MQTT loop in a separate thread
     client.loop_start()
 
-    # Run motion detection in main thread
     try:
         motion_loop(client)
     except KeyboardInterrupt:
         print("Exiting...")
-        relay.off()
+        # Ensure locked on exit? Or just stop.
+        pi.set_servo_pulsewidth(PIN_SERVO, 0) # Stop servo
+        pi.stop()
         if buzzer:
             buzzer.off()
         client.loop_stop()
