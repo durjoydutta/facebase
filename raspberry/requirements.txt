@@ -1,4 +1,4 @@
-gpiozero
 paho-mqtt
+gpiozero
 python-dotenv
-lgpio
+rpi.gpio

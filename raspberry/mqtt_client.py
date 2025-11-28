@@ -3,8 +3,8 @@ import time
 import json
 import threading
 import paho.mqtt.client as mqtt
-import pigpio
-from gpiozero import MotionSensor, Buzzer
+from gpiozero import MotionSensor, Buzzer, AngularServo
+from gpiozero.pins.pigpio import PiGPIOFactory
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -29,11 +29,9 @@ SERVO_LOCKED_ANGLE = 12
 SERVO_UNLOCKED_ANGLE = 97
 
 # Initialize Hardware
-pi = pigpio.pi()
-if not pi.connected:
-    print("Error: Could not connect to pigpio daemon. Is it running? (sudo pigpiod)")
-    exit(1)
-
+# Using default pin factory (RPi.GPIO or lgpio depending on what's installed)
+# If jitter is an issue, we can switch back to pigpio later.
+servo = AngularServo(PIN_SERVO, min_angle=0, max_angle=180, min_pulse_width=0.0005, max_pulse_width=0.0025)
 pir = MotionSensor(PIN_PIR)
 buzzer = None
 
@@ -48,30 +46,19 @@ MOTION_COOLDOWN = 5  # Seconds between motion events
 
 # --- Servo Helper Functions ---
 
-def set_angle(angle):
-    """
-    Sets the servo to a specific angle (0-180).
-    Maps angle to pulse width (500-2500us).
-    """
-    if angle < 0: angle = 0
-    if angle > 180: angle = 180
-    
-    pulse_width = 500 + (angle / 180.0) * 2000
-    pi.set_servo_pulsewidth(PIN_SERVO, pulse_width)
-
 def lock():
     """Moves servo to the locked position."""
     print(f"Locking door (Angle: {SERVO_LOCKED_ANGLE})...")
-    set_angle(SERVO_LOCKED_ANGLE)
-    # Allow time for movement
+    servo.angle = SERVO_LOCKED_ANGLE
     time.sleep(0.5)
-    # Optional: Turn off servo signal to prevent jitter/humming if holding torque isn't needed
-    # pi.set_servo_pulsewidth(PIN_SERVO, 0)
+    servo.detach() # Stop sending signal to prevent jitter
 
 def unlock():
     """Moves servo to the unlocked position."""
     print(f"Unlocking door (Angle: {SERVO_UNLOCKED_ANGLE})...")
-    set_angle(SERVO_UNLOCKED_ANGLE)
+    servo.angle = SERVO_UNLOCKED_ANGLE
+    time.sleep(0.5)
+    servo.detach()
 
 # --- MQTT Handlers ---
 
@@ -176,9 +163,7 @@ def main():
         motion_loop(client)
     except KeyboardInterrupt:
         print("Exiting...")
-        # Ensure locked on exit? Or just stop.
-        pi.set_servo_pulsewidth(PIN_SERVO, 0) # Stop servo
-        pi.stop()
+        servo.detach()
         if buzzer:
             buzzer.off()
         client.loop_stop()
