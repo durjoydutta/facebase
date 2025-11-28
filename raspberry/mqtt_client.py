@@ -4,7 +4,7 @@ import json
 import threading
 import paho.mqtt.client as mqtt
 from gpiozero import MotionSensor, Buzzer, AngularServo
-from gpiozero.pins.pigpio import PiGPIOFactory
+
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -49,16 +49,22 @@ MOTION_COOLDOWN = 5  # Seconds between motion events
 def lock():
     """Moves servo to the locked position."""
     print(f"Locking door (Angle: {SERVO_LOCKED_ANGLE})...")
-    servo.angle = SERVO_LOCKED_ANGLE
-    time.sleep(0.5)
-    servo.detach() # Stop sending signal to prevent jitter
+    try:
+        servo.angle = SERVO_LOCKED_ANGLE
+        time.sleep(0.5)
+        servo.detach() # Stop sending signal to prevent jitter
+    except Exception as e:
+        print(f"Error locking door: {e}")
 
 def unlock():
     """Moves servo to the unlocked position."""
     print(f"Unlocking door (Angle: {SERVO_UNLOCKED_ANGLE})...")
-    servo.angle = SERVO_UNLOCKED_ANGLE
-    time.sleep(0.5)
-    servo.detach()
+    try:
+        servo.angle = SERVO_UNLOCKED_ANGLE
+        time.sleep(0.5)
+        servo.detach()
+    except Exception as e:
+        print(f"Error unlocking door: {e}")
 
 # --- MQTT Handlers ---
 
