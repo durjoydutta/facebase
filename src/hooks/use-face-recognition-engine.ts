@@ -7,10 +7,11 @@ import type { VisitStatus } from "@/lib/database.types";
 const ACCEPTED_COOLDOWN_MS = 8_000;
 const UNKNOWN_COOLDOWN_MS = 3_000;
 const DISAPPEAR_RESET_MS = 2_000;
-const UI_PERSISTENCE_MS = 500;
-const AUTO_PAUSE_TIMEOUT_MS = 300_000; // 5 minutes
+const UI_PERSISTENCE_MS = 250;
+const AUTO_PAUSE_TIMEOUT_MS = 120_000; // 2 minutes
 const MATCH_THRESHOLD = 0.45;
-const MIN_PERSISTENCE_FRAMES = 3;
+const MIN_PERSISTENCE_FRAMES = 2;
+const MIN_DETECTION_INTERVAL_MS = 200; // Limit to ~5 FPS
 
 // --- Types ---
 
@@ -63,6 +64,7 @@ export const useFaceRecognitionEngine = ({
   const lastFacesSeenTimeRef = useRef<number>(Date.now());
   
   const lastFaceDetectedTimeRef = useRef<number>(Date.now()); // For Auto-Pause
+  const lastDetectionTimeRef = useRef<number>(0); // For throttling
   
   const decisionBufferRef = useRef<{
     type: "unlock" | "deny" | "none";
@@ -115,8 +117,15 @@ export const useFaceRecognitionEngine = ({
       isProcessing = true;
 
       try {
+        // Throttling Check
+        if (now - lastDetectionTimeRef.current < MIN_DETECTION_INTERVAL_MS) {
+           animationFrameId = requestAnimationFrame(processFrame);
+           return;
+        }
+        lastDetectionTimeRef.current = now;
+
         const detections = await faceapi
-          .detectAllFaces(video, new faceapi.TinyFaceDetectorOptions())
+          .detectAllFaces(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 }))
           .withFaceLandmarks()
           .withFaceDescriptors();
 

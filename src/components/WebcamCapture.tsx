@@ -17,7 +17,7 @@ interface WebcamCaptureProps {
   disabled?: boolean;
 }
 
-const detectionOptions = new faceapi.TinyFaceDetectorOptions();
+const detectionOptions = new faceapi.TinyFaceDetectorOptions({ inputSize: 320 });
 
 const WebcamCapture = ({
   onCapture,
@@ -39,8 +39,9 @@ const WebcamCapture = ({
         const stream = await navigator.mediaDevices.getUserMedia({
           video: {
             facingMode: "user",
-            width: { ideal: 1280 },
-            height: { ideal: 720 },
+            width: { ideal: 640 },
+            height: { ideal: 480 },
+            frameRate: { ideal: 15, max: 15 },
           },
           audio: false,
         });
