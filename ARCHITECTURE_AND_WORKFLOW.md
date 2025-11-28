@@ -27,6 +27,8 @@ The system follows a distributed architecture where the heavy lifting of facial 
 
 ### **System Diagram**
 
+![FaceBase System Architecture](/images/architecture.png)
+
 ```mermaid
 graph TD
     subgraph "Client Side (Browser)"

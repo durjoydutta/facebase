@@ -6,10 +6,11 @@ import type { VisitStatus } from "@/lib/database.types";
 // --- Configuration Constants ---
 const ACCEPTED_COOLDOWN_MS = 15_000;
 const UNKNOWN_COOLDOWN_MS = 6_000;
-const DISAPPEAR_RESET_MS = 4_000;
+const DISAPPEAR_RESET_MS = 5_000;
+const UI_PERSISTENCE_MS = 500;
 const AUTO_PAUSE_TIMEOUT_MS = 300_000; // 5 minutes
 const MATCH_THRESHOLD = 0.45;
-const MIN_PERSISTENCE_FRAMES = 5;
+const MIN_PERSISTENCE_FRAMES = 12;
 
 // --- Types ---
 
@@ -125,9 +126,17 @@ export const useFaceRecognitionEngine = ({
         // If no faces seen for DISAPPEAR_RESET_MS, reset decision buffer & presence
         // Note: We do NOT clear lastUnlockTimeRef (cooldowns persist)
         if (detections.length === 0) {
-          if (now - lastFacesSeenTimeRef.current > DISAPPEAR_RESET_MS) {
+          const timeSinceLastFace = now - lastFacesSeenTimeRef.current;
+
+          if (timeSinceLastFace > DISAPPEAR_RESET_MS) {
              decisionBufferRef.current = { type: "none", count: 0 };
           }
+
+          // Prevent UI flickering by holding state for a short time
+          if (timeSinceLastFace < UI_PERSISTENCE_MS) {
+            return;
+          }
+
           setDetectedFaces([]);
           return;
         }

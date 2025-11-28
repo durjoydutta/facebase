@@ -179,7 +179,7 @@ const RecognizeClient = ({ adminName, initialFaces }: RecognizeClientProps) => {
   // --- Canvas Drawing ---
 
   const clearOverlay = useCallback(() => {
-    const overlay = overlayRef.current;
+    const overlay = overlayRef.current
     const context = overlay?.getContext("2d");
     if (context && overlay) {
       context.clearRect(0, 0, overlay.width, overlay.height);
@@ -425,9 +425,9 @@ const RecognizeClient = ({ adminName, initialFaces }: RecognizeClientProps) => {
         </div>
       </header>
 
-      <div className="mx-auto grid w-full max-w-6xl gap-6 px-6 sm:px-10 lg:grid-cols-[1fr_350px] lg:h-[calc(100vh-12rem)] lg:min-h-[600px]">
+      <div className="mx-auto grid w-full max-w-6xl gap-6 px-6 sm:px-10 xl:grid-cols-[1fr_350px] xl:h-[calc(100vh-15rem)] xl:min-h-[600px]">
         {/* Main Video Feed */}
-        <section className="relative overflow-hidden rounded-3xl border border-border bg-black shadow-2xl h-full">
+        <section className="relative overflow-hidden rounded-3xl border border-border bg-black shadow-2xl h-[400px] sm:h-[500px] xl:h-full">
           <div className="relative h-full w-full overflow-hidden">
             <video
               ref={videoRef}
@@ -487,7 +487,7 @@ const RecognizeClient = ({ adminName, initialFaces }: RecognizeClientProps) => {
 
         {/* Sidebar */}
         <aside className="flex flex-col gap-6 h-full min-h-0">
-          <div className="flex-none overflow-hidden rounded-2xl border border-border bg-card shadow-sm h-[360px] lg:h-auto lg:min-h-[320px] lg:flex-[0_0_auto]">
+          <div className="flex-none overflow-hidden rounded-2xl border border-border bg-card shadow-sm h-[360px] xl:h-auto xl:min-h-[320px] xl:flex-[0_0_auto]">
             <div className="border-b border-border bg-muted/50 px-4 py-3">
               <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 Identification Status
@@ -554,7 +554,7 @@ const RecognizeClient = ({ adminName, initialFaces }: RecognizeClientProps) => {
             </div>
           </div>
 
-          <div className="flex h-[400px] lg:h-auto flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm flex-1 min-h-0">
+          <div className="flex h-[400px] xl:h-auto flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm flex-1 min-h-0">
             <div className="border-b border-border bg-muted/50 px-4 py-3">
               <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 Access Log
