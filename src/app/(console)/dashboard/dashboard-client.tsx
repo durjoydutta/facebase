@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import useSWR from "swr";
-import { ChevronRight, MoreHorizontal, Search, User } from "lucide-react";
+import { ChevronRight, Loader2, MoreHorizontal, Search, Shield, ShieldAlert, Trash2, User } from "lucide-react";
 
 import type {
   DashboardData,
@@ -313,7 +313,11 @@ const DashboardClient = ({ adminName, initialData }: DashboardClientProps) => {
             {admins.length ? (
               <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
                 {admins.map((user) => (
-                  <UserCard key={user.id} user={user} />
+                  <UserCard
+                    key={user.id}
+                    user={user}
+                    onRefresh={() => mutate()}
+                  />
                 ))}
               </div>
             ) : (
@@ -331,7 +335,11 @@ const DashboardClient = ({ adminName, initialData }: DashboardClientProps) => {
             {members.length ? (
               <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
                 {members.map((user) => (
-                  <UserCard key={user.id} user={user} />
+                  <UserCard
+                    key={user.id}
+                    user={user}
+                    onRefresh={() => mutate()}
+                  />
                 ))}
               </div>
             ) : (
@@ -354,75 +362,169 @@ const DashboardClient = ({ adminName, initialData }: DashboardClientProps) => {
 
 export default DashboardClient;
 
-const UserCard = ({ user }: { user: any }) => (
-  <Link
-    href={`/users/${user.id}`}
-    className="group relative flex flex-col overflow-hidden rounded-2xl border border-border bg-card transition hover:border-primary/50 hover:shadow-md">
-    <div className="flex flex-1 flex-col p-6">
-      <div className="flex items-start justify-between">
-        <div className="flex items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
-            <User className="h-6 w-6" />
+const UserCard = ({
+  user,
+  onRefresh,
+}: {
+  user: any;
+  onRefresh: () => void;
+}) => {
+  const [isLoading, setIsLoading] = useState(false);
+  const router = useRouter();
+
+  const handleBan = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsLoading(true);
+    try {
+      const response = await fetch(`/api/users/${user.id}/ban`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isBanned: !user.is_banned }),
+      });
+
+      if (!response.ok) throw new Error("Failed to update ban status");
+      onRefresh();
+    } catch (error) {
+      console.error(error);
+      alert("Failed to update ban status");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDelete = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (
+      !confirm(
+        "Are you sure you want to delete this user? This action cannot be undone."
+      )
+    )
+      return;
+
+    setIsLoading(true);
+    try {
+      const response = await fetch(`/api/users/${user.id}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) throw new Error("Failed to delete user");
+      onRefresh();
+    } catch (error) {
+      console.error(error);
+      alert("Failed to delete user");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <Link
+      href={`/users/${user.id}`}
+      className="group relative flex flex-col overflow-hidden rounded-2xl border border-border bg-card transition hover:border-primary/50 hover:shadow-md">
+      {isLoading && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/50 backdrop-blur-[1px]">
+          <Loader2 className="h-6 w-6 animate-spin text-primary" />
+        </div>
+      )}
+      <div className="flex flex-1 flex-col p-6">
+        <div className="flex items-start justify-between">
+          <div className="flex items-center gap-3">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
+              <User className="h-6 w-6" />
+            </div>
+            <div>
+              <div className="font-semibold text-foreground">
+                {user.name ?? "Unnamed"}
+              </div>
+              <div className="text-xs text-muted-foreground">{user.email}</div>
+            </div>
+          </div>
+          {user.is_banned ? (
+            <span className="inline-flex items-center rounded-full bg-destructive/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-destructive">
+              Banned
+            </span>
+          ) : (
+            <span className="inline-flex items-center rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-600">
+              Active
+            </span>
+          )}
+        </div>
+
+        <div className="mt-6 flex items-center justify-between text-xs text-muted-foreground">
+          <div className="flex items-center gap-1.5">
+            <span className="font-medium text-foreground">{user.role}</span>
           </div>
           <div>
-            <div className="font-semibold text-foreground">
-              {user.name ?? "Unnamed"}
-            </div>
-            <div className="text-xs text-muted-foreground">{user.email}</div>
+            Last seen:{" "}
+            <span className="font-medium text-foreground">
+              {user.lastSeen ? formatDate(user.lastSeen) : "Never"}
+            </span>
           </div>
         </div>
-        {user.is_banned ? (
-          <span className="inline-flex items-center rounded-full bg-destructive/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-destructive">
-            Banned
-          </span>
-        ) : (
-          <span className="inline-flex items-center rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-600">
-            Active
-          </span>
-        )}
-      </div>
 
-      <div className="mt-6 flex items-center justify-between text-xs text-muted-foreground">
-        <div className="flex items-center gap-1.5">
-          <span className="font-medium text-foreground">{user.role}</span>
-        </div>
-        <div>
-          Last seen:{" "}
-          <span className="font-medium text-foreground">
-            {user.lastSeen ? formatDate(user.lastSeen) : "Never"}
-          </span>
-        </div>
-      </div>
-
-      {/* Face Thumbnails */}
-      <div className="mt-6 flex items-center gap-2">
-        {user.recentFaces.length > 0 ? (
-          user.recentFaces.map((faceUrl: string, idx: number) => (
-            <div
-              key={idx}
-              className="relative h-10 w-10 overflow-hidden rounded-lg border border-border bg-muted">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={faceUrl}
-                alt="Face sample"
-                className="h-full w-full object-cover"
-              />
+        {/* Face Thumbnails */}
+        <div className="mt-6 flex items-center gap-2">
+          {user.recentFaces.length > 0 ? (
+            user.recentFaces.map((faceUrl: string, idx: number) => (
+              <div
+                key={idx}
+                className="relative h-10 w-10 overflow-hidden rounded-lg border border-border bg-muted">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={faceUrl}
+                  alt="Face sample"
+                  className="h-full w-full object-cover"
+                />
+              </div>
+            ))
+          ) : (
+            <span className="text-xs text-muted-foreground">
+              No face samples
+            </span>
+          )}
+          {user.faceCount > 3 && (
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-muted text-xs font-medium text-muted-foreground">
+              +{user.faceCount - 3}
             </div>
-          ))
-        ) : (
-          <span className="text-xs text-muted-foreground">No face samples</span>
-        )}
-        {user.faceCount > 3 && (
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-muted text-xs font-medium text-muted-foreground">
-            +{user.faceCount - 3}
-          </div>
-        )}
+          )}
+        </div>
       </div>
-    </div>
 
-    <div className="flex items-center justify-between border-t border-border bg-muted/30 px-6 py-3 text-xs font-medium text-muted-foreground group-hover:bg-primary/5 group-hover:text-primary">
-      <span>View Details</span>
-      <ChevronRight className="h-4 w-4" />
-    </div>
-  </Link>
-);
+      <div className="flex items-center justify-between border-t border-border bg-muted/30 px-4 py-3 text-xs font-medium text-muted-foreground group-hover:bg-primary/5">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleBan}
+            className={`flex items-center gap-1.5 rounded-md px-2 py-1 transition ${
+              user.is_banned
+                ? "text-emerald-600 hover:bg-emerald-500/10"
+                : "text-orange-600 hover:bg-orange-500/10"
+            }`}>
+            {user.is_banned ? (
+              <>
+                <Shield className="h-3.5 w-3.5" />
+                Unban
+              </>
+            ) : (
+              <>
+                <ShieldAlert className="h-3.5 w-3.5" />
+                Ban
+              </>
+            )}
+          </button>
+          <button
+            onClick={handleDelete}
+            className="flex items-center gap-1.5 rounded-md px-2 py-1 text-destructive transition hover:bg-destructive/10">
+            <Trash2 className="h-3.5 w-3.5" />
+            Delete
+          </button>
+        </div>
+        <div className="flex items-center gap-1 text-primary opacity-0 transition group-hover:opacity-100">
+          Details
+          <ChevronRight className="h-3.5 w-3.5" />
+        </div>
+      </div>
+    </Link>
+  );
+};

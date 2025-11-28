@@ -78,19 +78,20 @@ def on_message(client, userdata, msg):
         print(f"Received message on {msg.topic}: {payload}")
         
         result = payload.get('result')
+        user = payload.get('user', 'Unknown')
         
         if result == 'allowed':
-            handle_unlock()
+            handle_unlock(user)
         elif result == 'denied':
-            handle_denied()
+            handle_denied(user)
         elif result == 'cooldown':
             handle_cooldown()
             
     except json.JSONDecodeError:
         print("Failed to decode JSON payload")
 
-def handle_unlock():
-    print("Access GRANTED. Initiating unlock sequence...")
+def handle_unlock(user="Unknown"):
+    print(f"Access GRANTED to {user}. Initiating unlock sequence...")
     
     # Visual/Audio Feedback
     if buzzer:
@@ -111,8 +112,8 @@ def handle_unlock():
     lock()
     print("Door re-locked.")
 
-def handle_denied():
-    print("Access DENIED.")
+def handle_denied(user="Unknown"):
+    print(f"Access DENIED for {user}.")
     if buzzer:
         # 1 long beep
         buzzer.on()

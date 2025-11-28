@@ -36,7 +36,8 @@ Published by the Next.js app after processing a face. It tells the Raspberry Pi 
     ```json
     {
       "result": "allowed",
-      "banned": false
+      "banned": false,
+      "user": "John Doe"
     }
     ```
     *Action:* Pi unlocks the servo, beeps 3 times (success tone).
@@ -45,7 +46,8 @@ Published by the Next.js app after processing a face. It tells the Raspberry Pi 
     ```json
     {
       "result": "denied",
-      "banned": false
+      "banned": false,
+      "user": "Unknown"
     }
     ```
     *Action:* Pi keeps door locked, beeps 1 long time (error tone).
@@ -54,7 +56,8 @@ Published by the Next.js app after processing a face. It tells the Raspberry Pi 
     ```json
     {
       "result": "denied",
-      "banned": true
+      "banned": true,
+      "user": "Jane Doe"
     }
     ```
     *Action:* Pi keeps door locked, beeps 1 long time (error tone). *Note: The `banned` flag is currently used for logging/logic on the frontend, but the Pi treats it similarly to a standard denial.*

@@ -126,8 +126,8 @@ const RecognizeClient = ({ adminName, initialFaces }: RecognizeClientProps) => {
 
     // MQTT Publish
     const mqttResult = isUnlock ? "allowed" : "denied";
-    console.log(`Publishing MQTT facebase/access:`, { result: mqttResult, banned: isBanned });
-    mqttClient.publish("facebase/access", { result: mqttResult, banned: isBanned });
+    console.log(`Publishing MQTT facebase/access:`, { result: mqttResult, banned: isBanned, user: userName });
+    mqttClient.publish("facebase/access", { result: mqttResult, banned: isBanned, user: userName });
 
     // Log to Supabase
     if (loggingRef.current) return;

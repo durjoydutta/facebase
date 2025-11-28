@@ -4,13 +4,13 @@ import type { RecognitionFaceRow } from "@/lib/recognitionData";
 import type { VisitStatus } from "@/lib/database.types";
 
 // --- Configuration Constants ---
-const ACCEPTED_COOLDOWN_MS = 15_000;
+const ACCEPTED_COOLDOWN_MS = 10_000;
 const UNKNOWN_COOLDOWN_MS = 6_000;
-const DISAPPEAR_RESET_MS = 5_000;
-const UI_PERSISTENCE_MS = 500;
+const DISAPPEAR_RESET_MS = 2_000;
+const UI_PERSISTENCE_MS = 250;
 const AUTO_PAUSE_TIMEOUT_MS = 300_000; // 5 minutes
 const MATCH_THRESHOLD = 0.45;
-const MIN_PERSISTENCE_FRAMES = 12;
+const MIN_PERSISTENCE_FRAMES = 3;
 
 // --- Types ---
 
@@ -313,6 +313,7 @@ export const useFaceRecognitionEngine = ({
                   reason: decisionBufferRef.current.reason || "Access denied",
                   faces: currentFaces,
                   timestamp: now,
+                  matchedUser: decisionBufferRef.current.candidateUser, // Pass banned user if available
                 });
                 lastUnknownRejectTimeRef.current = now;
                 decisionBufferRef.current.count = 0;
