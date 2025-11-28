@@ -125,7 +125,7 @@ const RecognizeClient = ({ adminName, initialFaces }: RecognizeClientProps) => {
     setStatusMessage(logMessage);
 
     // MQTT Publish
-    const mqttResult = isUnlock ? "unlocked" : "denied";
+    const mqttResult = isUnlock ? "allowed" : "denied";
     console.log(`Publishing MQTT facebase/access:`, { result: mqttResult, banned: isBanned });
     mqttClient.publish("facebase/access", { result: mqttResult, banned: isBanned });
 

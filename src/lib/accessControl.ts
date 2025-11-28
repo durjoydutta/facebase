@@ -31,7 +31,7 @@ export const AccessControlService = {
         console.log("AccessControlService: MQTT Connected");
         let result = "denied";
         if (payload.status === "accepted") {
-          result = "unlocked";
+          result = "allowed";
         }
 
         const message = {

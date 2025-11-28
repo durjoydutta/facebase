@@ -35,7 +35,7 @@ Published by the Next.js app after processing a face. It tells the Raspberry Pi 
 *   **Unlock (Access Granted):**
     ```json
     {
-      "result": "unlocked",
+      "result": "allowed",
       "banned": false
     }
     ```

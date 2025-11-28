@@ -79,7 +79,7 @@ def on_message(client, userdata, msg):
         
         result = payload.get('result')
         
-        if result == 'unlocked':
+        if result == 'allowed':
             handle_unlock()
         elif result == 'denied':
             handle_denied()
