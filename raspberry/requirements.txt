@@ -2,3 +2,4 @@ paho-mqtt
 gpiozero
 python-dotenv
 rpi-hardware-pwm
+rpi-gpio
