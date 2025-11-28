@@ -13,9 +13,10 @@ import {
   type DetectedFace 
 } from "@/hooks/use-face-recognition-engine";
 import { LoadingOverlay } from "@/components/LoadingOverlay";
+import { getSupabaseBrowserClient } from "@/lib/supabaseBrowserClient";
 
 const MODEL_URL = "/models";
-const AUTO_SYNC_INTERVAL_MS = 60_000;
+const AUTO_SYNC_INTERVAL_MS = 10_000;
 
 interface RecognizeClientProps {
   adminName: string;
@@ -77,6 +78,7 @@ const RecognizeClient = ({ adminName, initialFaces }: RecognizeClientProps) => {
   const [events, setEvents] = useState<RecognitionEvent[]>([]);
   const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
   const [isManualSyncing, setIsManualSyncing] = useState(false);
+  const supabase = getSupabaseBrowserClient();
 
   // --- Helpers ---
 
@@ -345,6 +347,33 @@ const RecognizeClient = ({ adminName, initialFaces }: RecognizeClientProps) => {
       }
     };
   }, []);
+
+  // Realtime Subscription for Instant Updates
+  useEffect(() => {
+    const channel = supabase
+      .channel("recognition-updates")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "users" },
+        () => {
+          console.log("User data changed, refreshing...");
+          void mutate();
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "faces" },
+        () => {
+          console.log("Face data changed, refreshing...");
+          void mutate();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [supabase, mutate]);
 
   const handleManualSync = useCallback(async () => {
     try {

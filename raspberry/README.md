@@ -75,6 +75,15 @@ You can run the client using the python executable in the virtual environment.
 cd raspberry && .venv/bin/python mqtt_client.py
 ```
 
+## Audio Feedback
+
+The system provides distinct audio feedback via the buzzer:
+
+- **Access Granted**: 3 short beeps (Success)
+- **Access Denied (Unknown)**: 1 long beep (Warning)
+- **Access Denied (Banned)**: 5 fast beeps (Urgent Alert)
+- **Cooldown Active**: 2 medium beeps
+
 ## Troubleshooting
 
 -   **Servo Jitter**:

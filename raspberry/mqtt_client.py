@@ -79,11 +79,12 @@ def on_message(client, userdata, msg):
         
         result = payload.get('result')
         user = payload.get('user', 'Unknown')
+        is_banned = payload.get('banned', False)
         
         if result == 'allowed':
             handle_unlock(user)
         elif result == 'denied':
-            handle_denied(user)
+            handle_denied(user, is_banned)
         elif result == 'cooldown':
             handle_cooldown()
             
@@ -112,13 +113,22 @@ def handle_unlock(user="Unknown"):
     lock()
     print("Door re-locked.")
 
-def handle_denied(user="Unknown"):
-    print(f"Access DENIED for {user}.")
+def handle_denied(user="Unknown", is_banned=False):
+    print(f"Access DENIED for {user} (Banned: {is_banned})")
+    
     if buzzer:
-        # 1 long beep
-        buzzer.on()
-        time.sleep(1.0)
-        buzzer.off()
+        if is_banned:
+            # Banned Tone: 5 fast beeps (Urgent/Alert)
+            for _ in range(5):
+                buzzer.on()
+                time.sleep(0.1)
+                buzzer.off()
+                time.sleep(0.1)
+        else:
+            # Unknown/Denied Tone: 1 long beep
+            buzzer.on()
+            time.sleep(1.0)
+            buzzer.off()
 
 def handle_cooldown():
     print("Cooldown active.")

@@ -243,8 +243,20 @@ export const useFaceRecognitionEngine = ({
              }
            } else {
              // All known but all banned?
+             // Find the best match among all current faces
+             let bestAny: { face: RecognitionFaceRow; distance: number } | null = null;
+             
+             for (const face of currentFaces) {
+                if (face.match && (!bestAny || face.match.distance < bestAny.distance)) {
+                    bestAny = face.match;
+                }
+             }
+
              proposedDecision = "deny";
              decisionReason = "Access denied (Banned)";
+             if (bestAny) {
+                 decisionCandidate = bestAny.face;
+             }
            }
         }
         // 5. Single Recognized -> UNLOCK
@@ -261,8 +273,13 @@ export const useFaceRecognitionEngine = ({
              }
            } else {
              // Banned
+             // The single detection must be the banned user
+             const face = currentFaces[0];
              proposedDecision = "deny";
              decisionReason = "Access denied (Banned)";
+             if (face && face.match) {
+                 decisionCandidate = face.match.face;
+             }
            }
         }
 
