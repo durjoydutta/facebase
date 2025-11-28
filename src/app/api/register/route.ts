@@ -147,7 +147,7 @@ export async function POST(request: NextRequest) {
 
     if (samples.length === 0) {
       return NextResponse.json(
-        { error: "At least one face sample is required." },
+        { error: "At least one new face sample is required." },
         { status: 400 }
       );
     }
@@ -238,7 +238,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    await adminClient.from("faces").delete().eq("user_id", userRecord.id);
+
 
     const faceRows = [] as {
       user_id: string;

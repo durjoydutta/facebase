@@ -4,6 +4,41 @@ import { resolveAdminSession } from "@/lib/adminSession";
 
 export const dynamic = "force-dynamic";
 
+export async function GET(
+  _request: NextRequest,
+  context: { params: Promise<{ userId: string }> }
+) {
+  const session = await resolveAdminSession();
+
+  if (!session.ok) {
+    return NextResponse.json(
+      { error: session.message },
+      { status: session.status }
+    );
+  }
+
+  const { userId } = await context.params;
+
+  if (!userId) {
+    return NextResponse.json(
+      { error: "Missing user identifier." },
+      { status: 400 }
+    );
+  }
+
+  const { data: user, error } = await session.adminClient
+    .from("users")
+    .select("*, faces(*)")
+    .eq("id", userId)
+    .single();
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ user });
+}
+
 export async function DELETE(
   _request: NextRequest,
   context: { params: Promise<{ userId: string }> }

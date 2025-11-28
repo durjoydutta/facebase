@@ -15,7 +15,7 @@ export async function GET() {
 
   const { data: users, error } = await session.adminClient
     .from("users")
-    .select("id, name, email")
+    .select("id, name, email, faces(count)")
     .order("name", { ascending: true });
 
   if (error) {

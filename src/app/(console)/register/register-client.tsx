@@ -1,4 +1,5 @@
 "use client";
+import { Upload } from "lucide-react";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import * as faceapi from "face-api.js";
@@ -6,6 +7,8 @@ import useSWR from "swr";
 
 import FaceCard from "@/components/FaceCard";
 import WebcamCapture, { type CapturedSample } from "@/components/WebcamCapture";
+
+type ExtendedSample = CapturedSample & { isExisting?: boolean };
 
 interface RegisterClientProps {
   adminName: string;
@@ -16,6 +19,16 @@ interface RegisterClientProps {
 const MODEL_URL = "/models";
 const MIN_SAMPLES = 3;
 
+// Helper to load image from file
+const loadImageFromFile = (file: File): Promise<HTMLImageElement> => {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.src = URL.createObjectURL(file);
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+  });
+};
+
 const RegisterClient = ({
   adminName,
   initialName,
@@ -25,7 +38,7 @@ const RegisterClient = ({
   const [loadingMessage, setLoadingMessage] = useState<string | null>(
     "Loading face detection models..."
   );
-  const [samples, setSamples] = useState<CapturedSample[]>([]);
+  const [samples, setSamples] = useState<ExtendedSample[]>([]);
   const [baselineName, setBaselineName] = useState(initialName ?? "");
   const [baselineEmail, setBaselineEmail] = useState(initialEmail ?? "");
   const [name, setName] = useState(initialName ?? "");
@@ -36,6 +49,7 @@ const RegisterClient = ({
   const [isPrefilled, setIsPrefilled] = useState(
     Boolean(initialName || initialEmail)
   );
+  const [existingFaceCount, setExistingFaceCount] = useState(0);
 
   useEffect(() => {
     const resolvedName = initialName ?? "";
@@ -86,7 +100,23 @@ const RegisterClient = ({
     setError(null);
   };
 
-  const removeSample = (id: string) => {
+  const removeSample = async (id: string) => {
+    const sampleToRemove = samples.find((s) => s.id === id);
+    if (sampleToRemove?.isExisting) {
+      if (!confirm("Are you sure you want to delete this existing sample? This cannot be undone.")) {
+        return;
+      }
+      try {
+        const res = await fetch(`/api/faces/${id}`, { method: "DELETE" });
+        if (!res.ok) throw new Error("Failed to delete face sample");
+        // Update existing count locally to reflect deletion immediately
+        setExistingFaceCount((prev) => Math.max(0, prev - 1));
+      } catch (err) {
+        console.error(err);
+        alert("Failed to delete sample");
+        return;
+      }
+    }
     setSamples((previous) => previous.filter((sample) => sample.id !== id));
   };
 
@@ -94,6 +124,11 @@ const RegisterClient = ({
     setSamples([]);
     setName(baselineName);
     setEmail(baselineEmail);
+    // Don't reset existingFaceCount here as we might still be on the same user? 
+    // Actually, usually we reset to "New User" state or keep current?
+    // The original code kept baseline if isPrefilled.
+    // But if we just registered, maybe we should update the count?
+    // For now, let's just keep the form reset behavior.
     setStatus(
       isPrefilled
         ? "Face samples updated. Ready when you are for another capture."
@@ -101,13 +136,72 @@ const RegisterClient = ({
     );
   };
 
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+
+    setError(null);
+    setStatus("Processing uploaded images...");
+
+    let processedCount = 0;
+    let successCount = 0;
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      try {
+        const img = await loadImageFromFile(file);
+        
+        // Detect face
+        const detection = await faceapi
+          .detectSingleFace(img, new faceapi.TinyFaceDetectorOptions())
+          .withFaceLandmarks()
+          .withFaceDescriptor();
+
+        if (detection) {
+          // Create canvas to get clean data URL (and potentially resize if needed)
+          const canvas = document.createElement("canvas");
+          canvas.width = img.width;
+          canvas.height = img.height;
+          const ctx = canvas.getContext("2d");
+          if (ctx) {
+            ctx.drawImage(img, 0, 0);
+            const imageDataUrl = canvas.toDataURL("image/jpeg", 0.9);
+            
+            addSample({
+              id: crypto.randomUUID(),
+              imageDataUrl,
+              embedding: Array.from(detection.descriptor),
+              createdAt: Date.now(),
+            });
+            successCount++;
+          }
+        } else {
+          console.warn(`No face detected in ${file.name}`);
+        }
+      } catch (err) {
+        console.error(`Error processing ${file.name}:`, err);
+      }
+      processedCount++;
+    }
+
+    setStatus(null);
+    if (successCount === 0) {
+      setError("No valid faces detected in uploaded images. Please try clearer photos.");
+    } else if (successCount < files.length) {
+      setError(`Processed ${successCount}/${files.length} images. Some images had no detectable faces.`);
+    }
+    
+    // Reset input
+    event.target.value = "";
+  };
+
   const canSubmit = useMemo(
     () =>
       Boolean(name.trim()) &&
       Boolean(email.trim()) &&
-      samples.length >= MIN_SAMPLES &&
+      (existingFaceCount + samples.length >= MIN_SAMPLES) &&
       !isSubmitting,
-    [email, isSubmitting, name, samples.length]
+    [email, existingFaceCount, isSubmitting, name, samples.length]
   );
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
@@ -131,10 +225,12 @@ const RegisterClient = ({
           body: JSON.stringify({
             name: name.trim(),
             email: email.trim(),
-            samples: samples.map((sample) => ({
-              image: sample.imageDataUrl,
-              embedding: sample.embedding,
-            })),
+            samples: samples
+              .filter((s) => !s.isExisting)
+              .map((sample) => ({
+                image: sample.imageDataUrl,
+                embedding: sample.embedding,
+              })),
           }),
         });
 
@@ -158,7 +254,7 @@ const RegisterClient = ({
     });
   };
 
-  const { data: usersData } = useSWR<{ users: { id: string; name: string; email: string }[] }>(
+  const { data: usersData } = useSWR<{ users: { id: string; name: string; email: string; faces: { count: number }[] }[] }>(
     "/api/users",
     async (url: string) => {
       const res = await fetch(url);
@@ -175,6 +271,7 @@ const RegisterClient = ({
       setBaselineEmail("");
       setName("");
       setEmail("");
+      setExistingFaceCount(0);
       return;
     }
 
@@ -185,6 +282,24 @@ const RegisterClient = ({
       setBaselineEmail(user.email);
       setName(user.name);
       setEmail(user.email);
+      setExistingFaceCount(user.faces?.[0]?.count ?? 0);
+
+      // Fetch existing faces
+      fetch(`/api/users/${userId}`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.user?.faces) {
+            const existingSamples: ExtendedSample[] = data.user.faces.map((f: any) => ({
+              id: f.id,
+              imageDataUrl: f.image_url,
+              embedding: f.embedding, // Note: FaceCard doesn't use embedding, but we keep it for consistency
+              createdAt: new Date(f.created_at).getTime(),
+              isExisting: true,
+            }));
+            setSamples(existingSamples);
+          }
+        })
+        .catch((err) => console.error("Failed to fetch existing faces", err));
     }
   };
 
@@ -219,6 +334,31 @@ const RegisterClient = ({
               onError={setError}
               disabled={isSubmitting}
             />
+          </div>
+          
+          <div className="mt-4 flex items-center justify-center">
+            <span className="text-xs text-muted-foreground uppercase tracking-wider font-medium">OR</span>
+          </div>
+
+          <div className="mt-4">
+            <label
+              htmlFor="file-upload"
+              className={`flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-muted/50 px-4 py-8 text-sm font-medium transition hover:bg-muted ${
+                !modelsLoaded || isSubmitting ? "pointer-events-none opacity-50" : ""
+              }`}
+            >
+              <Upload className="h-5 w-5 text-muted-foreground" />
+              <span className="text-muted-foreground">Upload from Gallery</span>
+              <input
+                id="file-upload"
+                type="file"
+                accept="image/*"
+                multiple
+                className="hidden"
+                onChange={handleFileUpload}
+                disabled={!modelsLoaded || isSubmitting}
+              />
+            </label>
           </div>
           <p className="mt-3 text-xs text-muted-foreground">
             Tip: Position the subject at multiple angles and capture in even
@@ -255,10 +395,11 @@ const RegisterClient = ({
                 name="name"
                 value={name}
                 onChange={(event) => setName(event.target.value)}
-                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 disabled:cursor-not-allowed"
                 placeholder="Ada Lovelace"
                 autoComplete="off"
                 required
+                disabled={isPrefilled}
               />
             </div>
             <div className="space-y-2">
@@ -271,17 +412,20 @@ const RegisterClient = ({
                 type="email"
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
-                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 disabled:cursor-not-allowed"
                 placeholder="ada@example.com"
                 autoComplete="off"
                 required
+                disabled={isPrefilled}
               />
             </div>
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-semibold">Captured samples</h3>
                 <span className="text-xs text-muted-foreground">
-                  {samples.length}/{MIN_SAMPLES} minimum
+                  {existingFaceCount < MIN_SAMPLES
+                    ? `${samples.length}/${Math.max(1, MIN_SAMPLES - existingFaceCount)}`
+                    : `${samples.length} samples`}
                 </span>
               </div>
               {samples.length ? (
@@ -322,9 +466,10 @@ const RegisterClient = ({
                   setBaselineEmail("");
                   setName("");
                   setEmail("");
+                  setExistingFaceCount(0);
                 }}
                 className="w-full text-xs font-medium text-muted-foreground underline-offset-2 transition hover:text-foreground hover:underline">
-                ClearPrefilledDetails
+                Clear pre-filled details
               </button>
             ) : null}
           </form>
