@@ -25,8 +25,8 @@ PIN_BUZZER = int(os.getenv('FACEBASE_BUZZER_PIN', 27))
 UNLOCK_DURATION = int(os.getenv('FACEBASE_UNLOCK_SECONDS', 3))
 
 # Servo Configuration
-SERVO_LOCKED_ANGLE = 12
-SERVO_UNLOCKED_ANGLE = 97
+SERVO_LOCKED_ANGLE = 10
+SERVO_UNLOCKED_ANGLE = 120
 
 # Initialize Hardware
 # Using default pin factory (RPi.GPIO or lgpio depending on what's installed)
