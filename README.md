@@ -1,5 +1,7 @@
 # FaceBase – Face Recognition Access Control Console
 
+![FaceBase Banner](public/images/facebase_banner.png)
+
 FaceBase is an admin-focused access control platform that combines browser-based face recognition with Supabase authentication, storage, and logging. Administrators can enroll users, capture embeddings, run live recognition loops, and review visit history from a unified Next.js console that is future-ready for hardware integrations (e.g., Raspberry Pi door controllers).
 
 ## Table of Contents
@@ -19,6 +21,8 @@ FaceBase is an admin-focused access control platform that combines browser-based
 - [Deployment Notes](#deployment-notes)
 
 ## Features
+
+![FaceBase Features](public/images/facebase_workflow.png)
 
 - **Secure admin authentication** via Supabase Auth with role enforcement (admins only).
 - **Dashboard overview** summarizing recent visits, active users, and face sample counts.
@@ -41,6 +45,8 @@ FaceBase is an admin-focused access control platform that combines browser-based
 ## Architecture
 
 > **Note:** For a deep dive into the system architecture, hardware integration, and logical workflow, please read the [**Architecture & Workflow Documentation**](./ARCHITECTURE_AND_WORKFLOW.md).
+
+![FaceBase Architecture](public/images/facebase_architecture.png)
 
 ```
 src/
@@ -167,5 +173,3 @@ These files are already tracked in the repo. If you need to refresh them, downlo
 - **Future hardware integrations:** The system now uses MQTT for real-time communication. The Next.js app publishes access decisions to `facebase/access` and listens for motion on `facebase/motion`. See `raspberry/README.md` for the Pi client setup.
 
 ---
-
-Happy hacking! If you extend the console, keep the Tailwind + shadcn/ui patterns for a cohesive admin experience.
