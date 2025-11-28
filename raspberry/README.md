@@ -1,46 +1,42 @@
-# FaceBase Raspberry Pi Client (MQTT)
+# FaceBase Raspberry Pi Client
 
-This folder contains the Python client for the FaceBase access control system. It uses MQTT to communicate with the Next.js admin console and controls hardware components via GPIO.
+This folder contains the Python client for the FaceBase access control system. It runs on a Raspberry Pi, communicating with the Next.js admin console via MQTT and controlling hardware components (Servo, PIR, Buzzer) via GPIO.
 
 ## Features
-- **Motion Detection**: Uses a PIR sensor to detect visitors and publishes `facebase/motion` events.
-- **Access Control**: Subscribes to `facebase/access` to unlock the door (Servo) and provide audio feedback (Buzzer).
-- **Real-time**: Event-driven architecture for low latency.
+- **Motion Detection**: Uses a PIR sensor to detect visitors and publishes `facebase/motion` events to the cloud.
+- **Access Control**: Subscribes to `facebase/access` to receive unlock commands.
+- **Hardware Control**:
+  - **Servo**: Unlocks the door when access is granted.
+  - **Buzzer**: Provides audio feedback for access granted, denied, or cooldown states.
+- **Robustness**: Auto-reconnects to MQTT and handles sensor cooldowns.
 
-## Hardware Setup
-- **Servo Motor**: Connected to GPIO 17 (default). Controls the locking mechanism.
-- **PIR Sensor**: Connected to GPIO 4 (default). Detects motion.
-- **Buzzer**: Connected to GPIO 27 (default). Provides audio feedback (beeps).
+## Hardware Setup (GPIO BCM)
+| Component | Default Pin | Description |
+|-----------|-------------|-------------|
+| **Servo** | GPIO 17 | Controls the locking mechanism. |
+| **PIR** | GPIO 4 | Detects motion. |
+| **Buzzer** | GPIO 27 | Active buzzer for audio feedback. |
 
-**Note:** The servo requires the `pigpio` daemon to be running for precise timing.
+**Note:** The servo requires the `pigpio` daemon for precise timing and jitter reduction.
 
-## Quick Start
+## Prerequisites
 
-### 1. System Requirements
-This client requires `pigpio` for servo control. Install it on your Raspberry Pi:
+### 1. System Packages
+The client requires `pigpio` to be installed and running on the Raspberry Pi.
 
 ```bash
 sudo apt-get update
 sudo apt-get install pigpio python3-venv
 ```
 
-**Enable and start the daemon:**
+**Enable and start the pigpio daemon:**
 ```bash
 sudo systemctl enable pigpiod
 sudo systemctl start pigpiod
 ```
 
-### 2. Install Dependencies
-
-```bash
-cd raspberry
-python -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-pip install -r requirements.txt
-```
-
-### 3. Configuration
-Create a `.env.local` file in this directory (or use the one in the root if symlinked):
+### 2. Environment Variables
+The script automatically loads environment variables from the **project root** `.env.local` file (`../.env.local`). Ensure this file exists in the parent directory with the following variables:
 
 ```env
 # MQTT Configuration
@@ -49,19 +45,51 @@ MQTT_PORT=8883
 MQTT_USERNAME=your_username
 MQTT_PASSWORD=your_password
 
-# Hardware Pinout (BCM)
+# Hardware Configuration (Optional overrides)
 FACEBASE_SERVO_PIN=17
 FACEBASE_PIR_PIN=4
 FACEBASE_BUZZER_PIN=27
 FACEBASE_UNLOCK_SECONDS=3
 ```
 
-### 4. Run the Client
+## Installation
 
+1.  **Navigate to the folder:**
+    ```bash
+    cd raspberry
+    ```
+
+2.  **Create a virtual environment:**
+    ```bash
+    python3 -m venv .venv
+    ```
+
+3.  **Install dependencies:**
+    ```bash
+    .venv/bin/pip install -r requirements.txt
+    ```
+
+## Running the Client
+
+You can run the client using the python executable in the virtual environment.
+
+**From the `raspberry` directory:**
 ```bash
-python mqtt_client.py
+.venv/bin/python mqtt_client.py
 ```
 
-## MQTT Topics
-- **Publish**: `facebase/motion` - Payload: `{"event": "motion_detected"}`
-- **Subscribe**: `facebase/access` - Payload: `{"result": "unlocked" | "denied", "banned": boolean}`
+**One-liner (copy-paste friendly):**
+```bash
+cd raspberry && .venv/bin/python mqtt_client.py
+```
+
+## Troubleshooting
+
+-   **`pigpio` connection error**:
+    If you see `Error: Could not connect to pigpio daemon`, make sure you ran `sudo systemctl start pigpiod`.
+-   **Permission denied**:
+    Ensure your user has permission to access GPIO (usually the `gpio` group).
+-   **Buzzer not working**:
+    Check if you have an active or passive buzzer. This script assumes an active buzzer (on/off).
+-   **Servo jitter**:
+    Ensure `pigpiod` is running. Software PWM (via RPi.GPIO) is often too jittery for servos; `pigpio` uses hardware timing.
