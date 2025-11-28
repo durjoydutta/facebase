@@ -4,8 +4,8 @@ import type { RecognitionFaceRow } from "@/lib/recognitionData";
 import type { VisitStatus } from "@/lib/database.types";
 
 // --- Configuration Constants ---
-const ACCEPTED_COOLDOWN_MS = 10_000;
-const UNKNOWN_COOLDOWN_MS = 6_000;
+const ACCEPTED_COOLDOWN_MS = 8_000;
+const UNKNOWN_COOLDOWN_MS = 5_000;
 const DISAPPEAR_RESET_MS = 2_000;
 const UI_PERSISTENCE_MS = 250;
 const AUTO_PAUSE_TIMEOUT_MS = 300_000; // 5 minutes

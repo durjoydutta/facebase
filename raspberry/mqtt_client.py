@@ -52,7 +52,7 @@ def lock():
     try:
         servo.angle = SERVO_LOCKED_ANGLE
         time.sleep(0.5)
-        servo.detach() # Stop sending signal to prevent jitter
+        servo.angle = None # Stop sending signal to prevent jitter
     except Exception as e:
         print(f"Error locking door: {e}")
 
@@ -62,7 +62,7 @@ def unlock():
     try:
         servo.angle = SERVO_UNLOCKED_ANGLE
         time.sleep(0.5)
-        servo.detach()
+        servo.angle = None # Stop sending signal to prevent jitter
     except Exception as e:
         print(f"Error unlocking door: {e}")
 
@@ -121,9 +121,9 @@ def handle_denied(user="Unknown", is_banned=False):
             # Banned Tone: 5 fast beeps (Urgent/Alert)
             for _ in range(5):
                 buzzer.on()
-                time.sleep(0.1)
+                time.sleep(0.25)
                 buzzer.off()
-                time.sleep(0.1)
+                time.sleep(0.25)
         else:
             # Unknown/Denied Tone: 1 long beep
             buzzer.on()
