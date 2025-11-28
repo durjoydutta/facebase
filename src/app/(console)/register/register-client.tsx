@@ -7,6 +7,7 @@ import useSWR from "swr";
 
 import FaceCard from "@/components/FaceCard";
 import WebcamCapture, { type CapturedSample } from "@/components/WebcamCapture";
+import { LoadingOverlay } from "@/components/LoadingOverlay";
 
 type ExtendedSample = CapturedSample & { isExisting?: boolean };
 
@@ -45,6 +46,7 @@ const RegisterClient = ({
   const [email, setEmail] = useState(initialEmail ?? "");
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
+  const [loadingText, setLoadingText] = useState<string | null>(null);
   const [isSubmitting, startSubmit] = useTransition();
   const [isPrefilled, setIsPrefilled] = useState(
     Boolean(initialName || initialEmail)
@@ -141,6 +143,7 @@ const RegisterClient = ({
     if (!files || files.length === 0) return;
 
     setError(null);
+    setLoadingText("Processing uploaded images...");
     setStatus("Processing uploaded images...");
 
     let processedCount = 0;
@@ -184,6 +187,7 @@ const RegisterClient = ({
       processedCount++;
     }
 
+    setLoadingText(null);
     setStatus(null);
     if (successCount === 0) {
       setError("No valid faces detected in uploaded images. Please try clearer photos.");
@@ -213,6 +217,7 @@ const RegisterClient = ({
     }
 
     setError(null);
+    setLoadingText("Uploading samples to Supabase...");
     setStatus("Uploading samples to Supabase...");
 
     startSubmit(async () => {
@@ -251,6 +256,9 @@ const RegisterClient = ({
             : "Registration failed. Please try again."
         );
       }
+      finally {
+        setLoadingText(null);
+      }
     });
   };
 
@@ -285,6 +293,7 @@ const RegisterClient = ({
       setExistingFaceCount(user.faces?.[0]?.count ?? 0);
 
       // Fetch existing faces
+      setLoadingText("Fetching user details...");
       fetch(`/api/users/${userId}`)
         .then((res) => res.json())
         .then((data) => {
@@ -299,12 +308,14 @@ const RegisterClient = ({
             setSamples(existingSamples);
           }
         })
-        .catch((err) => console.error("Failed to fetch existing faces", err));
+        .catch((err) => console.error("Failed to fetch existing faces", err))
+        .finally(() => setLoadingText(null));
     }
   };
 
   return (
-    <main className="mx-auto w-full max-w-5xl space-y-8 px-6 pb-16 pt-6 sm:px-10">
+    <main className="mx-auto w-full max-w-5xl space-y-8 px-6 pb-16 pt-6 sm:px-10 relative">
+      <LoadingOverlay isLoading={!!loadingText} message={loadingText || ""} fullScreen />
       <header className="space-y-2">
         <h1 className="text-3xl font-semibold tracking-tight">
           Register / Update User

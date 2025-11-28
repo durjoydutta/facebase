@@ -8,6 +8,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
 import { getSupabaseBrowserClient } from "@/lib/supabaseBrowserClient";
 import { resolveEmailFromUserId, resolveEmailFromUsername } from "./actions";
+import { LoadingOverlay } from "@/components/LoadingOverlay";
 
 let supabaseInitError: Error | null = null;
 let supabaseClient: SupabaseClient<Database> | null = null;
@@ -28,6 +29,7 @@ const LoginPage = () => {
   const [showResetForm, setShowResetForm] = useState(false);
   const [isSigningIn, startSignInTransition] = useTransition();
   const [isResetting, startResetTransition] = useTransition();
+  const [loadingText, setLoadingText] = useState<string | null>(null);
   const supabase = supabaseClient;
 
   useEffect(() => {
@@ -101,8 +103,10 @@ SUPABASE_SECRET_KEY=your-service-role-key`}
     setError(null);
     setStatus(null);
 
+    setLoadingText("Signing in...");
     startSignInTransition(async () => {
-      const trimmedIdentifier = identifier.trim();
+      try {
+        const trimmedIdentifier = identifier.trim();
 
       if (!trimmedIdentifier || !password) {
         setError("Email/User ID and password are required.");
@@ -141,6 +145,9 @@ SUPABASE_SECRET_KEY=your-service-role-key`}
 
       setStatus("Signed in successfully. Redirecting...");
       router.replace("/dashboard");
+      } finally {
+        setLoadingText(null);
+      }
     });
   };
 
@@ -149,8 +156,10 @@ SUPABASE_SECRET_KEY=your-service-role-key`}
     setError(null);
     setStatus(null);
 
+    setLoadingText("Sending reset link...");
     startResetTransition(async () => {
-      const targetEmail = (resetEmail || identifier).trim();
+      try {
+        const targetEmail = (resetEmail || identifier).trim();
 
       if (!targetEmail) {
         setError("Enter the admin email to send a reset link.");
@@ -180,6 +189,9 @@ SUPABASE_SECRET_KEY=your-service-role-key`}
       setStatus("Password reset link sent.");
       setShowResetForm(false);
       setResetEmail("");
+      } finally {
+        setLoadingText(null);
+      }
     });
   };
 
@@ -200,7 +212,8 @@ SUPABASE_SECRET_KEY=your-service-role-key`}
   };
 
   return (
-    <main className="flex min-h-[70vh] flex-col items-center justify-center px-6 py-16 sm:px-10">
+    <main className="flex min-h-[70vh] flex-col items-center justify-center px-6 py-16 sm:px-10 relative">
+      <LoadingOverlay isLoading={!!loadingText} message={loadingText || ""} fullScreen />
       <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-8 shadow-sm">
         <div className="space-y-2 text-center">
           <h1 className="text-2xl font-semibold tracking-tight">Admin Login</h1>

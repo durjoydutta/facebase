@@ -14,6 +14,7 @@ import {
 
 import type { VisitStatus } from "@/lib/database.types";
 import { ImageModal } from "@/components/ImageModal";
+import { LoadingOverlay } from "@/components/LoadingOverlay";
 
 interface HistoryClientProps {
   initialVisits: any[];
@@ -62,6 +63,7 @@ const HistoryClient = ({ initialVisits, initialTotal }: HistoryClientProps) => {
 
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
+  const [loadingText, setLoadingText] = useState<string | null>(null);
 
   const limit = 20;
 
@@ -111,6 +113,7 @@ const HistoryClient = ({ initialVisits, initialTotal }: HistoryClientProps) => {
     if (!confirm("Are you sure you want to delete this record?")) return;
 
     setIsDeleting(id);
+    setLoadingText("Deleting record...");
     try {
       const res = await fetch(`/api/visits/${id}`, { method: "DELETE" });
       if (!res.ok) throw new Error("Failed to delete");
@@ -120,6 +123,7 @@ const HistoryClient = ({ initialVisits, initialTotal }: HistoryClientProps) => {
       alert("Failed to delete record");
     } finally {
       setIsDeleting(null);
+      setLoadingText(null);
     }
   };
 
@@ -154,6 +158,7 @@ const HistoryClient = ({ initialVisits, initialTotal }: HistoryClientProps) => {
       return;
 
     setIsDeleting("bulk");
+    setLoadingText("Deleting selected records...");
     try {
       const res = await fetch("/api/visits", {
         method: "DELETE",
@@ -170,11 +175,13 @@ const HistoryClient = ({ initialVisits, initialTotal }: HistoryClientProps) => {
       alert("Failed to delete records");
     } finally {
       setIsDeleting(null);
+      setLoadingText(null);
     }
   };
 
   return (
-    <main className="mx-auto w-full max-w-6xl space-y-6 px-6 pb-10 sm:px-10">
+    <main className="mx-auto w-full max-w-6xl space-y-6 px-6 pb-10 sm:px-10 relative">
+      <LoadingOverlay isLoading={!!loadingText} message={loadingText || ""} fullScreen />
       <ImageModal
         isOpen={!!selectedImage}
         onClose={() => setSelectedImage(null)}

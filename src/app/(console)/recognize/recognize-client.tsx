@@ -12,6 +12,7 @@ import {
   type AccessDecisionEvent, 
   type DetectedFace 
 } from "@/hooks/use-face-recognition-engine";
+import { LoadingOverlay } from "@/components/LoadingOverlay";
 
 const MODEL_URL = "/models";
 const AUTO_SYNC_INTERVAL_MS = 60_000;
@@ -373,7 +374,8 @@ const RecognizeClient = ({ adminName, initialFaces }: RecognizeClientProps) => {
     : "text-muted-foreground bg-muted";
 
   return (
-    <main className="space-y-8 pb-10">
+    <main className="space-y-8 pb-10 relative">
+      <LoadingOverlay isLoading={isManualSyncing} message="Syncing with database..." fullScreen />
       <header className="mx-auto w-full max-w-6xl px-6 sm:px-10">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>

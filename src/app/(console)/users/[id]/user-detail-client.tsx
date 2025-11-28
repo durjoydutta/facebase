@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 
 import { ImageModal } from "@/components/ImageModal";
+import { LoadingOverlay } from "@/components/LoadingOverlay";
 import type { Database, VisitStatus } from "@/lib/database.types";
 
 // --- Attendance Calendar Component ---
@@ -195,6 +196,7 @@ const UserDetailClient = ({
   const [isBanned, setIsBanned] = useState(user.is_banned);
   const [faces, setFaces] = useState(initialFaces);
   const [isLoadingAction, setIsLoadingAction] = useState(false);
+  const [loadingText, setLoadingText] = useState<string | null>(null);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
   // Pagination state
@@ -224,6 +226,7 @@ const UserDetailClient = ({
 
   const handleToggleBan = async () => {
     setIsLoadingAction(true);
+    setLoadingText(isBanned ? "Unbanning user..." : "Banning user...");
     try {
       const nextState = !isBanned;
       const response = await fetch(`/api/users/${user.id}/ban`, {
@@ -240,6 +243,7 @@ const UserDetailClient = ({
       alert("Failed to update ban status");
     } finally {
       setIsLoadingAction(false);
+      setLoadingText(null);
     }
   };
 
@@ -252,6 +256,7 @@ const UserDetailClient = ({
       return;
 
     setIsLoadingAction(true);
+    setLoadingText("Deleting user...");
     try {
       const response = await fetch(`/api/users/${user.id}`, {
         method: "DELETE",
@@ -263,6 +268,7 @@ const UserDetailClient = ({
       console.error(error);
       alert("Failed to delete user");
       setIsLoadingAction(false);
+      setLoadingText(null);
     }
   };
 
@@ -270,6 +276,7 @@ const UserDetailClient = ({
     if (!confirm("Delete this face sample?")) return;
 
     try {
+      setLoadingText("Deleting face sample...");
       const response = await fetch(`/api/faces/${faceId}`, {
         method: "DELETE",
       });
@@ -280,6 +287,8 @@ const UserDetailClient = ({
     } catch (error) {
       console.error(error);
       alert("Failed to delete face sample");
+    } finally {
+      setLoadingText(null);
     }
   };
 
@@ -292,6 +301,7 @@ const UserDetailClient = ({
   const handleUpdateUser = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoadingAction(true);
+    setLoadingText("Updating user details...");
     try {
       const response = await fetch(`/api/users/${user.id}`, {
         method: "PATCH",
@@ -308,6 +318,7 @@ const UserDetailClient = ({
       alert("Failed to update user details");
     } finally {
       setIsLoadingAction(false);
+      setLoadingText(null);
     }
   };
 
@@ -342,6 +353,7 @@ const UserDetailClient = ({
       return;
 
     setIsDeleting("bulk");
+    setLoadingText("Deleting selected records...");
     try {
       const res = await fetch("/api/visits", {
         method: "DELETE",
@@ -366,11 +378,13 @@ const UserDetailClient = ({
       alert("Failed to delete records");
     } finally {
       setIsDeleting(null);
+      setLoadingText(null);
     }
   };
 
   return (
-    <main className="space-y-8 pb-10">
+    <main className="space-y-8 pb-10 relative">
+      <LoadingOverlay isLoading={!!loadingText} message={loadingText || ""} fullScreen />
       {/* ... (existing modals) ... */}
       <ImageModal
         isOpen={!!selectedImage}
