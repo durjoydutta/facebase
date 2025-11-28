@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -86,8 +87,15 @@ const AdminHeader = ({ profile }: AdminHeaderProps) => {
     <header className="border-b border-border bg-card/60 backdrop-blur supports-[backdrop-filter]:bg-card/75">
       <div className="mx-auto w-full max-w-6xl px-6 py-4 sm:px-10">
         <div className="relative flex items-center justify-between">
-          <Link href="/" className="text-lg font-semibold">
-            FaceBase
+          <Link href="/" className="flex items-center gap-2">
+            <div className="relative h-16 w-16 overflow-hidden rounded-xl transition-transform hover:scale-105">
+              <Image
+                src="/logo.png"
+                alt="FaceBase"
+                fill
+                className="object-cover"
+              />
+            </div>
           </Link>
           <nav className="hidden items-center gap-2 sm:flex">
             {navItems.map((item) => (

@@ -24,6 +24,9 @@ export const metadata: Metadata = {
   },
   description:
     "facebase is the centralized console for biometric access management.",
+  icons: {
+    icon: "/logo.png",
+  },
 };
 
 const RootLayout = ({ children }: Readonly<{ children: ReactNode }>) => (

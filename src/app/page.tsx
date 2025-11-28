@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 
 import AccountRibbon from "@/components/layout/AccountRibbon";
 import { getOptionalAdminProfile } from "@/lib/auth";
@@ -49,6 +50,14 @@ const HomePage = async () => {
 
       <section className="mx-auto flex min-h-[80vh] w-full max-w-6xl flex-col items-center justify-center gap-14 px-6 py-24 text-center sm:px-10 lg:px-16">
         <div className="flex flex-col items-center gap-6">
+          <div className="relative mb-4 h-24 w-24 overflow-hidden rounded-2xl shadow-2xl shadow-primary/20">
+            <Image
+              src="/logo.png"
+              alt="FaceBase"
+              fill
+              className="object-cover"
+            />
+          </div>
           <span className="inline-flex items-center rounded-full border border-border/60 bg-background/70 px-4 py-1 text-xs font-medium uppercase tracking-[0.4em] text-muted-foreground">
             facebase
           </span>

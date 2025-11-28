@@ -7,6 +7,7 @@ FaceBase is an admin-focused access control platform that combines browser-based
 - [Features](#features)
 - [Tech Stack](#tech-stack)
 - [Architecture](#architecture)
+- [Detailed Workflow](./ARCHITECTURE_AND_WORKFLOW.md) 
 - [Prerequisites](#prerequisites)
 - [Local Setup](#local-setup)
 - [Environment Variables](#environment-variables)
@@ -38,6 +39,8 @@ FaceBase is an admin-focused access control platform that combines browser-based
 - **Additional tooling:** ESLint 9, Turbopack dev/build pipeline
 
 ## Architecture
+
+> **Note:** For a deep dive into the system architecture, hardware integration, and logical workflow, please read the [**Architecture & Workflow Documentation**](./ARCHITECTURE_AND_WORKFLOW.md).
 
 ```
 src/
