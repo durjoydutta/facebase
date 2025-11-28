@@ -3,7 +3,8 @@ import time
 import json
 import threading
 import paho.mqtt.client as mqtt
-from gpiozero import MotionSensor, Buzzer, AngularServo
+from gpiozero import MotionSensor, Buzzer
+from rpi_hardware_pwm import HardwarePWM
 
 from dotenv import load_dotenv
 
@@ -19,33 +20,8 @@ MQTT_TOPIC_MOTION = os.getenv('MQTT_TOPIC_MOTION', 'facebase/motion')
 MQTT_TOPIC_ACCESS = os.getenv('MQTT_TOPIC_ACCESS', 'facebase/access')
 
 # Hardware Pin Configuration
-PIN_SERVO = int(os.getenv('FACEBASE_SERVO_PIN', 17))
-PIN_PIR = int(os.getenv('FACEBASE_PIR_PIN', 4))
-PIN_BUZZER = int(os.getenv('FACEBASE_BUZZER_PIN', 27))
-UNLOCK_DURATION = int(os.getenv('FACEBASE_UNLOCK_SECONDS', 3))
-
-import os
-import time
-import json
-import threading
-import paho.mqtt.client as mqtt
-from gpiozero import MotionSensor, Buzzer, AngularServo
-
-from dotenv import load_dotenv
-
-# Load environment variables
-load_dotenv('../.env.local')
-
-# Configuration
-MQTT_BROKER = os.getenv('MQTT_BROKER_URL', 'broker.hivemq.com')
-MQTT_PORT = int(os.getenv('MQTT_PORT', 1883))
-MQTT_USERNAME = os.getenv('MQTT_USERNAME', '')
-MQTT_PASSWORD = os.getenv('MQTT_PASSWORD', '')
-MQTT_TOPIC_MOTION = os.getenv('MQTT_TOPIC_MOTION', 'facebase/motion')
-MQTT_TOPIC_ACCESS = os.getenv('MQTT_TOPIC_ACCESS', 'facebase/access')
-
-# Hardware Pin Configuration
-PIN_SERVO = int(os.getenv('FACEBASE_SERVO_PIN', 17))
+# Note: HardwarePWM uses channel index. Channel 0 is usually GPIO 18.
+PIN_SERVO_CHANNEL = 0 
 PIN_PIR = int(os.getenv('FACEBASE_PIR_PIN', 4))
 PIN_BUZZER = int(os.getenv('FACEBASE_BUZZER_PIN', 27))
 UNLOCK_DURATION = int(os.getenv('FACEBASE_UNLOCK_SECONDS', 3))
@@ -55,10 +31,20 @@ SERVO_LOCKED_ANGLE = 130
 SERVO_UNLOCKED_ANGLE = 10
 
 # Initialize Hardware
-# Using default pin factory (RPi.GPIO or lgpio depending on what's installed)
-# SG90 Safe Range: 1ms (0.001) to 2ms (0.002). 
-# Extended range (0.5ms-2.5ms) can cause continuous rotation/grinding on some units.
-servo = AngularServo(PIN_SERVO, min_angle=0, max_angle=180, min_pulse_width=0.001, max_pulse_width=0.002)
+# Using rpi-hardware-pwm for Hardware PWM to prevent jitter.
+# REQUIREMENT: Enable PWM overlay in /boot/config.txt
+try:
+    servo = HardwarePWM(pwm_channel=PIN_SERVO_CHANNEL, hz=50)
+    servo.start(0) # Start with 0 duty cycle
+except Exception as e:
+    print(f"Error initializing HardwarePWM: {e}")
+    print("Make sure to enable PWM overlay in /boot/config.txt")
+    servo = None
+
+# SG90 Duty Cycles (approximate for 50Hz):
+# 0 deg = 2.5%
+# 90 deg = 7.5%
+# 180 deg = 12.5%
 pir = MotionSensor(PIN_PIR)
 buzzer = None
 
@@ -75,21 +61,33 @@ MOTION_COOLDOWN = 5  # Seconds between motion events
 
 def lock():
     """Moves servo to the locked position."""
-    print(f"Locking door (Angle: {SERVO_LOCKED_ANGLE})...")
+    print(f"Locking door...")
+    if not servo:
+        print("Servo not initialized.")
+        return
+        
     try:
-        servo.angle = SERVO_LOCKED_ANGLE
+        # 130 degrees approx -> ~9.7% duty
+        servo.change_duty_cycle(9.7)
         time.sleep(0.5)
-        servo.angle = None # Stop sending signal to prevent jitter
+        # Stop signal to prevent jitter/hum
+        servo.change_duty_cycle(0) 
     except Exception as e:
         print(f"Error locking door: {e}")
 
 def unlock():
     """Moves servo to the unlocked position."""
-    print(f"Unlocking door (Angle: {SERVO_UNLOCKED_ANGLE})...")
+    print(f"Unlocking door...")
+    if not servo:
+        print("Servo not initialized.")
+        return
+
     try:
-        servo.angle = SERVO_UNLOCKED_ANGLE
+        # 10 degrees approx -> ~3.0% duty
+        servo.change_duty_cycle(3.0)
         time.sleep(0.5)
-        servo.angle = None # Stop sending signal to prevent jitter
+        # Stop signal
+        servo.change_duty_cycle(0)
     except Exception as e:
         print(f"Error unlocking door: {e}")
 
@@ -210,8 +208,8 @@ def main():
         print("Exiting...")
     finally:
         print("Cleaning up resources...")
-        servo.angle = None
-        servo.detach()
+        if servo:
+            servo.stop()
         if buzzer:
             buzzer.off()
         try:
