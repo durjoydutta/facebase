@@ -24,14 +24,41 @@ PIN_PIR = int(os.getenv('FACEBASE_PIR_PIN', 4))
 PIN_BUZZER = int(os.getenv('FACEBASE_BUZZER_PIN', 27))
 UNLOCK_DURATION = int(os.getenv('FACEBASE_UNLOCK_SECONDS', 3))
 
+import os
+import time
+import json
+import threading
+import paho.mqtt.client as mqtt
+from gpiozero import MotionSensor, Buzzer, AngularServo
+
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv('../.env.local')
+
+# Configuration
+MQTT_BROKER = os.getenv('MQTT_BROKER_URL', 'broker.hivemq.com')
+MQTT_PORT = int(os.getenv('MQTT_PORT', 1883))
+MQTT_USERNAME = os.getenv('MQTT_USERNAME', '')
+MQTT_PASSWORD = os.getenv('MQTT_PASSWORD', '')
+MQTT_TOPIC_MOTION = os.getenv('MQTT_TOPIC_MOTION', 'facebase/motion')
+MQTT_TOPIC_ACCESS = os.getenv('MQTT_TOPIC_ACCESS', 'facebase/access')
+
+# Hardware Pin Configuration
+PIN_SERVO = int(os.getenv('FACEBASE_SERVO_PIN', 17))
+PIN_PIR = int(os.getenv('FACEBASE_PIR_PIN', 4))
+PIN_BUZZER = int(os.getenv('FACEBASE_BUZZER_PIN', 27))
+UNLOCK_DURATION = int(os.getenv('FACEBASE_UNLOCK_SECONDS', 3))
+
 # Servo Configuration
 SERVO_LOCKED_ANGLE = 130
 SERVO_UNLOCKED_ANGLE = 10
 
 # Initialize Hardware
 # Using default pin factory (RPi.GPIO or lgpio depending on what's installed)
-# If jitter is an issue, we can switch back to pigpio later.
-servo = AngularServo(PIN_SERVO, min_angle=0, max_angle=180, min_pulse_width=0.0005, max_pulse_width=0.0025)
+# SG90 Safe Range: 1ms (0.001) to 2ms (0.002). 
+# Extended range (0.5ms-2.5ms) can cause continuous rotation/grinding on some units.
+servo = AngularServo(PIN_SERVO, min_angle=0, max_angle=180, min_pulse_width=0.001, max_pulse_width=0.002)
 pir = MotionSensor(PIN_PIR)
 buzzer = None
 
@@ -153,38 +180,45 @@ def motion_loop(client):
         time.sleep(0.1)
 
 def main():
-    # Set initial state to locked
-    lock()
+    try:
+        # Set initial state to locked
+        lock()
 
-    client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
-    
-    if MQTT_USERNAME and MQTT_PASSWORD:
-        client.username_pw_set(MQTT_USERNAME, MQTT_PASSWORD)
+        client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
         
-    if MQTT_PORT == 8883:
-        client.tls_set()
+        if MQTT_USERNAME and MQTT_PASSWORD:
+            client.username_pw_set(MQTT_USERNAME, MQTT_PASSWORD)
+            
+        if MQTT_PORT == 8883:
+            client.tls_set()
 
-    client.on_connect = on_connect
-    client.on_message = on_message
+        client.on_connect = on_connect
+        client.on_message = on_message
 
-    print(f"Connecting to MQTT broker at {MQTT_BROKER}:{MQTT_PORT}...")
-    try:
-        client.connect(MQTT_BROKER, MQTT_PORT, 60)
-    except Exception as e:
-        print(f"Failed to connect to MQTT broker: {e}")
-        return
+        print(f"Connecting to MQTT broker at {MQTT_BROKER}:{MQTT_PORT}...")
+        try:
+            client.connect(MQTT_BROKER, MQTT_PORT, 60)
+        except Exception as e:
+            print(f"Failed to connect to MQTT broker: {e}")
+            return
 
-    client.loop_start()
+        client.loop_start()
 
-    try:
         motion_loop(client)
+        
     except KeyboardInterrupt:
         print("Exiting...")
+    finally:
+        print("Cleaning up resources...")
+        servo.angle = None
         servo.detach()
         if buzzer:
             buzzer.off()
-        client.loop_stop()
-        client.disconnect()
+        try:
+            client.loop_stop()
+            client.disconnect()
+        except:
+            pass
 
 if __name__ == '__main__':
     main()
