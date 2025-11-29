@@ -99,6 +99,36 @@ The system provides distinct audio feedback via the buzzer:
 - **Access Denied (Banned)**: 5 fast beeps (Urgent Alert)
 - **Cooldown Active**: 2 medium beeps
 
+## Auto-Start on Boot
+
+To configure the MQTT client to start automatically when the Raspberry Pi boots, use the provided `setup_service.sh` script.
+
+1.  **Make the script executable:**
+    ```bash
+    chmod +x setup_service.sh
+    ```
+
+2.  **Run the setup script:**
+    ```bash
+    ./setup_service.sh
+    ```
+    This script will:
+    - Create a systemd service file `/etc/systemd/system/facebase_mqtt.service`.
+    - Configure the service to run as `root` (required for hardware PWM control).
+    - Use the Python interpreter from the `.venv` virtual environment.
+    - Enable and start the service immediately.
+
+3.  **Check the status:**
+    ```bash
+    sudo systemctl status facebase_mqtt.service
+    ```
+
+4.  **View logs:**
+    To see the output of the running service:
+    ```bash
+    sudo journalctl -u facebase_mqtt.service -f
+    ```
+
 ## Troubleshooting
 
 -   **Servo Jitter**:
