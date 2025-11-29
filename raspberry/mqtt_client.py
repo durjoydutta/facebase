@@ -35,7 +35,7 @@ SERVO_UNLOCKED_ANGLE = 10
 # REQUIREMENT: Enable PWM overlay in /boot/config.txt
 try:
     servo = HardwarePWM(pwm_channel=PIN_SERVO_CHANNEL, hz=50)
-    # servo.start(0) # Do not start immediately to prevent jitter
+    servo.start(0) # Start with 0 duty cycle
 except Exception as e:
     print(f"Error initializing HardwarePWM: {e}")
     print("Make sure to enable PWM overlay in /boot/config.txt")
@@ -68,14 +68,12 @@ def lock():
         
     try:
         # 130 degrees approx -> ~9.7% duty
-        servo.start(9.7)
+        servo.change_duty_cycle(9.7)
         time.sleep(0.5)
+        # Stop signal to prevent jitter/hum
+        servo.change_duty_cycle(0) 
     except Exception as e:
         print(f"Error locking door: {e}")
-    finally:
-        # Stop signal to prevent jitter/hum
-        if servo:
-            servo.stop()
 
 def unlock():
     """Moves servo to the unlocked position."""
@@ -86,14 +84,12 @@ def unlock():
 
     try:
         # 10 degrees approx -> ~3.0% duty
-        servo.start(3.0)
+        servo.change_duty_cycle(3.0)
         time.sleep(0.5)
+        # Stop signal
+        servo.change_duty_cycle(0)
     except Exception as e:
         print(f"Error unlocking door: {e}")
-    finally:
-        # Stop signal
-        if servo:
-            servo.stop()
 
 # --- MQTT Handlers ---
 
