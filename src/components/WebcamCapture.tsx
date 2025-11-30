@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import * as faceapi from "face-api.js";
+import { useNativeCamera } from "@/hooks/use-native-camera";
 
 export interface CapturedSample {
   id: string;
@@ -30,6 +31,7 @@ const WebcamCapture = ({
   const overlayRef = useRef<HTMLCanvasElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const [isCapturing, setIsCapturing] = useState(false);
+  const { getPhoto, isNative } = useNativeCamera();
 
   useEffect(() => {
     let cancelled = false;
@@ -199,6 +201,47 @@ const WebcamCapture = ({
     }
 
     if (disabled) {
+      return;
+    }
+
+    if (isNative) {
+      setIsCapturing(true);
+      try {
+        const dataUrl = await getPhoto();
+        if (!dataUrl) {
+          setIsCapturing(false);
+          return;
+        }
+
+        const img = new Image();
+        img.src = dataUrl;
+        await new Promise((resolve) => {
+          img.onload = resolve;
+        });
+
+        const detection = await faceapi
+          .detectSingleFace(img, detectionOptions)
+          .withFaceLandmarks()
+          .withFaceDescriptor();
+
+        if (!detection) {
+          onError("No face detected in photo. Please try again.");
+          return;
+        }
+
+        const sample: CapturedSample = {
+          id: crypto.randomUUID(),
+          embedding: Array.from(detection.descriptor),
+          imageDataUrl: dataUrl,
+          createdAt: Date.now(),
+        };
+
+        onCapture(sample);
+      } catch (error) {
+        onError("Native capture failed.");
+      } finally {
+        setIsCapturing(false);
+      }
       return;
     }
 

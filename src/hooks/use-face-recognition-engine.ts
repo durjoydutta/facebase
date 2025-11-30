@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import * as faceapi from "face-api.js";
 import type { RecognitionFaceRow } from "@/lib/recognitionData";
 import type { VisitStatus } from "@/lib/database.types";
+import { useHaptics } from "./use-haptics";
+import { NotificationType, ImpactStyle } from "@capacitor/haptics";
 
 // --- Configuration Constants ---
 const ACCEPTED_COOLDOWN_MS = 8_000;
@@ -49,6 +51,9 @@ export const useFaceRecognitionEngine = ({
 }: UseFaceRecognitionEngineProps) => {
   const [isScanning, setIsScanning] = useState(true);
   const [detectedFaces, setDetectedFaces] = useState<DetectedFace[]>([]);
+  const { triggerImpact, triggerNotification, vibrate } = useHaptics();
+  const prevFaceCountRef = useRef(0);
+
   
   // --- Internal State Refs ---
   
@@ -138,8 +143,15 @@ export const useFaceRecognitionEngine = ({
           }
 
           setDetectedFaces([]);
+          prevFaceCountRef.current = 0;
           return;
         }
+
+        // Haptic: Face Detected (on entry)
+        if (prevFaceCountRef.current === 0 && detections.length > 0) {
+          triggerImpact(ImpactStyle.Light);
+        }
+        prevFaceCountRef.current = detections.length;
 
         // Faces present
         lastFacesSeenTimeRef.current = now;
@@ -334,6 +346,7 @@ export const useFaceRecognitionEngine = ({
                 timestamp: now,
                 matchedUser: user,
               });
+              triggerNotification(NotificationType.Success);
               lastUnlockTimeRef.current.set(userId, now);
               decisionBufferRef.current.count = 0; // Reset buffer after action
             }
@@ -347,6 +360,15 @@ export const useFaceRecognitionEngine = ({
                   timestamp: now,
                   matchedUser: decisionBufferRef.current.candidateUser, // Pass banned user if available
                 });
+                
+                // Haptic: Check if banned or just unknown
+                const isBannedDeny = decisionBufferRef.current.candidateUser?.user?.is_banned;
+                if (isBannedDeny) {
+                    vibrate(500); // Heavy/Long for banned
+                } else {
+                    triggerNotification(NotificationType.Warning); // Warning for unknown
+                }
+
                 lastUnknownRejectTimeRef.current = now;
                 decisionBufferRef.current.count = 0;
              }
