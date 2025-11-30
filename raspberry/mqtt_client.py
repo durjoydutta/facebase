@@ -117,7 +117,7 @@ def on_message(client, userdata, msg):
         print("Failed to decode JSON payload")
 
 def handle_unlock(user="Unknown"):
-    print(f"Access GRANTED to {user}. Initiating unlock sequence...")
+    print(f"Access GRANTED to: {user}. Initiating unlock sequence...")
     
     # Visual/Audio Feedback
     if buzzer:

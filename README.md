@@ -145,20 +145,6 @@ These files are already tracked in the repo. If you need to refresh them, downlo
 1. **Enrollment (/register):**
 
    - The webcam capture component runs TinyFaceDetector to draw live bounding boxes.
-   - Captured samples store compressed JPEG snapshots and 128-d embeddings produced by `face-api.js`.
-   - Server-side API uploads images to the `faces` bucket and embeddings to the `faces` table.
-
-2. **Recognition (/recognize):**
-
-   - SWR fetches embeddings from `/api/recognize` and keeps them fresh via manual/auto sync.
-   - A continuous detection loop compares live descriptors against stored embeddings.
-   - Visitors above the match threshold are marked **accepted**; others are **rejected**. Each encounter is logged to the `visits` table and the `visit-snapshots` bucket, and the UI overlays bounding boxes + user labels in real time.
-
-3. **Auditing (/history):**
-   - Server components apply optional filters (status/date) using Supabase queries.
-   - Matching user metadata is retrieved in bulk for quick lookups.
-
-## Troubleshooting
 
 - **Large payload errors** when uploading snapshots: the capture pipeline downscales frames to ≤640px and exports JPEG at 0.85 quality. If you still hit Supabase function payload limits, lower quality in `WebcamCapture.tsx` or configure Supabase Edge Function limits.
 - **Models fail to load:** ensure `public/models` files are deployed and accessible (case-sensitive paths). Check your deployment URL – face-api.js loads models via `fetch('/models/...')`.

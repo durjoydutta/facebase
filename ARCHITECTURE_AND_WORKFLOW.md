@@ -98,8 +98,9 @@ The recognition engine (`use-face-recognition-engine.ts`) is the core intelligen
 5.  **Multi-Frame Voting (Persistence)**:
     *   A decision is not made instantly. The system waits for **5 consecutive frames** (`MIN_PERSISTENCE_FRAMES`) of consistent results to prevent flickering or false positives.
 6.  **Access Rules**:
-    *   **All Known**: If all detected faces are known -> **GRANT ACCESS**.
-    *   **Mixed**: If known and unknown faces are present together -> **DENY ACCESS** (Security Rule).
+    *   **All Known**: If all detected faces are known and allowed -> **GRANT ACCESS**.
+    *   **Mixed Group**: If known and unknown faces are present -> **DENY ACCESS** (Security Rule).
+    *   **Banned in Group**: If *any* banned user is detected (even with allowed users) -> **DENY ACCESS** (Strict Security).
     *   **Unknown**: If only unknown faces are present -> **DENY ACCESS**.
 
 ---

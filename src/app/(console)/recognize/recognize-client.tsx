@@ -116,7 +116,21 @@ const RecognizeClient = ({ adminName, initialFaces }: RecognizeClientProps) => {
     
     // Determine primary user for logging
     const primaryUser = matchedUser ?? null;
-    const userName = primaryUser?.user?.name ?? primaryUser?.user?.email ?? (isUnlock ? "Member" : "Unknown");
+    
+    // Collect all known names from the detected faces (including banned)
+    const recognizedUsers = decisionFaces
+      .filter(f => f.status === "known" && f.match?.face?.user?.name)
+      .map(f => {
+        const name = f.match!.face.user!.name;
+        return f.isBanned ? `${name} (Banned)` : name;
+      });
+      
+    const uniqueNames = Array.from(new Set(recognizedUsers));
+    
+    const userName = uniqueNames.length > 0 
+      ? uniqueNames.join(", ") 
+      : (primaryUser?.user?.name ?? primaryUser?.user?.email ?? (isUnlock ? "Member" : "Unknown"));
+
     const userEmail = primaryUser?.user?.email ?? "";
     const isBanned = primaryUser?.user?.is_banned ?? false;
 

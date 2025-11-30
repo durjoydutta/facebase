@@ -154,6 +154,7 @@ export const useFaceRecognitionEngine = ({
         
         // Candidates for unlock (known, not banned)
         const unlockCandidates: { face: RecognitionFaceRow; distance: number }[] = [];
+        let anyBanned = false;
 
         for (const detection of detections) {
           let bestMatch: { face: RecognitionFaceRow; distance: number } | null = null;
@@ -173,6 +174,10 @@ export const useFaceRecognitionEngine = ({
           const isKnown = !!bestMatch;
           const isBanned = bestMatch?.face.user?.is_banned ?? false;
           
+          if (isBanned) {
+            anyBanned = true;
+          }
+
           if (isKnown) {
             hasKnown = true;
             allUnknown = false;
@@ -204,8 +209,18 @@ export const useFaceRecognitionEngine = ({
         let decisionCandidate: RecognitionFaceRow | undefined = undefined;
         let decisionReason = "";
 
+        // 0. Banned User Detected -> DENY ALWAYS (Highest Priority)
+        if (anyBanned) {
+             proposedDecision = "deny";
+             decisionReason = "Group contains banned user";
+             // Find the banned user to set as candidate for logging
+             const bannedFace = currentFaces.find(f => f.isBanned);
+             if (bannedFace && bannedFace.match) {
+                 decisionCandidate = bannedFace.match.face;
+             }
+        }
         // 1. Mixed Known + Unknown -> DENY ALWAYS
-        if (hasKnown && hasUnknown) {
+        else if (hasKnown && hasUnknown) {
           // Check unknown cooldown
           if (now - lastUnknownRejectTimeRef.current >= UNKNOWN_COOLDOWN_MS) {
             proposedDecision = "deny";
