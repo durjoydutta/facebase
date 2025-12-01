@@ -10,7 +10,7 @@ const DISAPPEAR_RESET_MS = 2_000;
 const UI_PERSISTENCE_MS = 500;
 const AUTO_PAUSE_TIMEOUT_MS = 60_000; // 1 minute
 const MATCH_THRESHOLD = 0.45;
-const MIN_PERSISTENCE_FRAMES = 1;
+const MIN_PERSISTENCE_FRAMES = 3;
 const DETECTION_INTERVAL_MS = 100; // Cap at ~10 FPS to reduce CPU load
 const DETECTOR_OPTIONS = new faceapi.TinyFaceDetectorOptions({
   inputSize: 224, // Reduced from default (416) for speed
@@ -68,7 +68,6 @@ export const useFaceRecognitionEngine = ({
   const lastFacesSeenTimeRef = useRef<number>(Date.now());
   
   const lastFaceDetectedTimeRef = useRef<number>(Date.now()); // For Auto-Pause
-  const lastDetectionTimeRef = useRef<number>(0); // For throttling
   
   const decisionBufferRef = useRef<{
     type: "unlock" | "deny" | "none";
@@ -121,15 +120,8 @@ export const useFaceRecognitionEngine = ({
       isProcessing = true;
 
       try {
-        // Throttling Check
-        if (now - lastDetectionTimeRef.current < DETECTION_INTERVAL_MS) {
-           animationFrameId = requestAnimationFrame(processFrame);
-           return;
-        }
-        lastDetectionTimeRef.current = now;
-
         const detections = await faceapi
-          .detectAllFaces(video, DETECTOR_OPTIONS)
+          .detectAllFaces(video, new faceapi.TinyFaceDetectorOptions())
           .withFaceLandmarks()
           .withFaceDescriptors();
 
