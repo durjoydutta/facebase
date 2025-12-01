@@ -10,7 +10,7 @@ const DISAPPEAR_RESET_MS = 2_000;
 const UI_PERSISTENCE_MS = 500;
 const AUTO_PAUSE_TIMEOUT_MS = 60_000; // 1 minute
 const MATCH_THRESHOLD = 0.45;
-const MIN_PERSISTENCE_FRAMES = 3;
+const MIN_PERSISTENCE_FRAMES = 1;
 const DETECTION_INTERVAL_MS = 100; // Cap at ~10 FPS to reduce CPU load
 const DETECTOR_OPTIONS = new faceapi.TinyFaceDetectorOptions({
   inputSize: 224, // Reduced from default (416) for speed
