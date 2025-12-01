@@ -10,12 +10,14 @@ const DISAPPEAR_RESET_MS = 2_000;
 const UI_PERSISTENCE_MS = 500;
 const AUTO_PAUSE_TIMEOUT_MS = 15_000; // 15 seconds
 const MATCH_THRESHOLD = 0.45;
-const MIN_PERSISTENCE_FRAMES = 1;
-const DETECTION_INTERVAL_MS = 100; // Cap at ~10 FPS to reduce CPU load
+const MIN_PERSISTENCE_FRAMES_KNOWN = 1;
+const MIN_PERSISTENCE_FRAMES_UNKNOWN = 3;
 const DETECTOR_OPTIONS = new faceapi.TinyFaceDetectorOptions({
   inputSize: 224, // Reduced from default (416) for speed
   scoreThreshold: 0.5,
 });
+const DETECTION_INTERVAL_MS = 100; // Cap at ~10 FPS to reduce CPU load
+
 
 // --- Types ---
 
@@ -68,6 +70,7 @@ export const useFaceRecognitionEngine = ({
   const lastFacesSeenTimeRef = useRef<number>(Date.now());
   
   const lastFaceDetectedTimeRef = useRef<number>(Date.now()); // For Auto-Pause
+  const lastDetectionTimeRef = useRef<number>(0); // For throttling
   
   const decisionBufferRef = useRef<{
     type: "unlock" | "deny" | "none";
@@ -120,8 +123,15 @@ export const useFaceRecognitionEngine = ({
       isProcessing = true;
 
       try {
+        // Throttling Check
+        if (now - lastDetectionTimeRef.current < DETECTION_INTERVAL_MS) {
+           animationFrameId = requestAnimationFrame(processFrame);
+           return;
+        }
+        lastDetectionTimeRef.current = now;
+
         const detections = await faceapi
-          .detectAllFaces(video, new faceapi.TinyFaceDetectorOptions())
+          .detectAllFaces(video, DETECTOR_OPTIONS)
           .withFaceLandmarks()
           .withFaceDescriptors();
 
@@ -322,7 +332,11 @@ export const useFaceRecognitionEngine = ({
         }
 
         // --- Execute Decision ---
-        if (decisionBufferRef.current.count >= MIN_PERSISTENCE_FRAMES) {
+        const requiredFrames = decisionBufferRef.current.type === "unlock" 
+          ? MIN_PERSISTENCE_FRAMES_KNOWN 
+          : MIN_PERSISTENCE_FRAMES_UNKNOWN;
+
+        if (decisionBufferRef.current.count >= requiredFrames) {
           const decision = decisionBufferRef.current.type;
           
           if (decision === "unlock" && decisionBufferRef.current.candidateUser) {
