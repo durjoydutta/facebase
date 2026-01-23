@@ -1,7 +1,5 @@
 # FaceBase – Face Recognition Access Control Console
 
-![FaceBase Banner](public/images/facebase_banner.png)
-
 FaceBase is an admin-focused access control platform that combines browser-based face recognition with Supabase authentication, storage, and logging. Administrators can enroll users, capture embeddings, run live recognition loops, and review visit history from a unified Next.js console that is future-ready for hardware integrations (e.g., Raspberry Pi door controllers).
 
 ## Table of Contents
